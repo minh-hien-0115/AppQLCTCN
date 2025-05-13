@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "507039027793",
+    "project_id": "qlctcn-760a9",
+    "storage_bucket": "qlctcn-760a9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:507039027793:android:89a94aa8b6d2179a7c9e70",
+        "android_client_info": {
+          "package_name": "com.appqlctcn"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCPrOjX8OO0KK_MCsoxutm_nS3slVyatQE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
