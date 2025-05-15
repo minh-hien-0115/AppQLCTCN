@@ -1,20 +1,22 @@
-import { StyleSheet, Text, View } from 'react-native'
-import React from 'react'
+import React, { useEffect, useState } from 'react';
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import { NavigationContainer } from '@react-navigation/native';
+import { LoginNavigators, MainNavigators } from './src/navigations';
 
-const App = () => {
+export default function App() {
+  const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = auth().onAuthStateChanged(userAuth => {
+      setUser(userAuth);
+    });
+
+    return unsubscribe;
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <Text>App</Text>
-    </View>
-  )
+    <NavigationContainer>
+      {user ? <MainNavigators /> : <LoginNavigators />}
+    </NavigationContainer>
+  );
 }
-
-export default App
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  }
-})
