@@ -138,16 +138,13 @@ const LoginScreen = ({navigation}: any) => {
       {/* Social Media Icons */}
       <View style={styles.socialIconsContainer}>
         <TouchableOpacity style={styles.iconButton}>
-          <Ionicons name="call-outline" size={30} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.iconButton}>
           <Ionicons name="logo-facebook" size={30} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.iconButton}>
-          <Ionicons name="logo-apple" size={30} />
+          <Ionicons name="logo-google" size={30} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.iconButton}>
-          <Ionicons name="logo-google" size={30} />
+          <Ionicons name="logo-apple" size={30} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>

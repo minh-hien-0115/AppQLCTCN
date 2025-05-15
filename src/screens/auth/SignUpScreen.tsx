@@ -159,10 +159,10 @@ const SignUpScreen = ({ navigation }: any) => {
       {/* Social Login Icons */}
       <View style={styles.socialIconsContainer}>
         <TouchableOpacity style={styles.iconButton}>
-          <Ionicons name="logo-google" size={30} />
+          <Ionicons name="logo-facebook" size={30} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.iconButton}>
-          <Ionicons name="logo-facebook" size={30} />
+          <Ionicons name="logo-google" size={30} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.iconButton}>
           <Ionicons name="logo-apple" size={30} />
