@@ -20,7 +20,7 @@ const StatisticalScreen = () => {
   const [filteredTransactions, setFilteredTransactions] = useState<any[]>([]);
   const [timeFilter, setTimeFilter] = useState('all');
   const [chartType, setChartType] = useState('bar');
-  const [typeFilter, setTypeFilter] = useState('both'); // 'income', 'expense', 'both'
+  const [typeFilter, setTypeFilter] = useState('both');
 
   useEffect(() => {
     const unsubscribe = firestore()
@@ -96,7 +96,17 @@ const StatisticalScreen = () => {
     }),
   );
 
-  const formatCurrency = (num: number) => num.toLocaleString('vi-VN') + ' đ';
+  const formatCurrency = (num: number) =>
+    num.toLocaleString('vi-VN') + ' đ';
+
+  const formatShortCurrency = (label: string): string => {
+    const num = parseFloat(label);
+    if (num >= 1e7) return (num / 1e6).toFixed(1).replace(/\.0$/, '') + 'tr';
+    if (num >= 1e6) return (num / 1e6).toFixed(1).replace(/\.0$/, '') + 'tr';
+    if (num >= 1e5) return (num / 1e3).toFixed(0) + 'k';
+    if (num >= 1e4) return (num / 1e3).toFixed(1) + 'k';
+    return num.toLocaleString('vi-VN');
+  };
 
   const barChartData = {
     labels: categoryList.map(item => item.category),
@@ -116,20 +126,21 @@ const StatisticalScreen = () => {
     return color;
   }
 
-  const pieChartData = categoryList.map(item => ({
-    name: item.category,
-    amount: item.amount,
-    color: getRandomColor(),
-    legendFontColor: '#333',
-    legendFontSize: 14,
-  }));
+  const totalAmount = categoryList.reduce((sum, item) => sum + item.amount, 0);
 
-  // For bar and pie chart, we use categoryList + colors, for line chart we show date and values
-  // Prepare colors for bar/line chart legend
-  // Generate colors for categories in bar chart legend
-  const colorsForLegend = categoryList.map(() => getRandomColor());
+  const pieChartData = categoryList.map(item => {
+    const percent = ((item.amount / totalAmount) * 100).toFixed(1);
+    return {
+      name: `${item.category} (${percent}%)`,
+      amount: item.amount,
+      color: getRandomColor(),
+      legendFontColor: '#333',
+      legendFontSize: 14,
+    };
+  });
 
-  // Map categories to colors (reuse colorsForLegend)
+  const colorsForLegend = pieChartData.map(item => item.color);
+
   const categoryColorsMap = categoryList.reduce<Record<string, string>>(
     (acc, item, idx) => {
       acc[item.category] = colorsForLegend[idx];
@@ -138,28 +149,50 @@ const StatisticalScreen = () => {
     {},
   );
 
-  // Line chart data grouped by date
-  const dailyAmountMap = filteredTransactions
-    .filter(t => (typeFilter === 'both' ? true : t.type === typeFilter))
-    .reduce((acc: Record<string, number>, t) => {
-      const date = dayjs(t.date).format('DD/MM');
-      acc[date] = (acc[date] || 0) + t.amount;
-      return acc;
-    }, {});
+  // ➕ Group transactions for last 7 days
+  const last7Days = Array.from({ length: 7 }).map((_, i) =>
+  dayjs().subtract(2 - i, 'day').format('DD/MM'),
+);
 
-  const sortedDates = Object.keys(dailyAmountMap).sort((a, b) => {
-    const da = dayjs(a, 'DD/MM');
-    const db = dayjs(b, 'DD/MM');
-    return da.isBefore(db) ? -1 : 1;
+  const dailyData: Record<string, {income: number; expense: number}> = {};
+  last7Days.forEach(date => {
+    dailyData[date] = {income: 0, expense: 0};
+  });
+
+  filteredTransactions.forEach(t => {
+    const date = dayjs(t.date).format('DD/MM');
+    if (dailyData[date]) {
+      if (t.type === 'income') dailyData[date].income += t.amount;
+      if (t.type === 'expense') dailyData[date].expense += t.amount;
+    }
   });
 
   const lineChartData = {
-    labels: sortedDates,
+    labels: last7Days,
     datasets: [
       {
-        data: sortedDates.map(date => dailyAmountMap[date]),
+        data: last7Days.map(date => dailyData[date].income),
+        color: () => '#4caf50',
         strokeWidth: 2,
-        color: () => '#1e90ff',
+      },
+      {
+        data: last7Days.map(date => dailyData[date].expense),
+        color: () => '#f44336',
+        strokeWidth: 2,
+      },
+    ],
+    legend: ['Thu nhập', 'Chi tiêu'],
+  };
+
+  const barChart7DayData = {
+    labels: last7Days,
+    datasets: [
+      {
+        data: last7Days.map(date => {
+          if (typeFilter === 'income') return dailyData[date].income;
+          if (typeFilter === 'expense') return dailyData[date].expense;
+          return dailyData[date].income - dailyData[date].expense;
+        }),
       },
     ],
   };
@@ -172,34 +205,24 @@ const StatisticalScreen = () => {
     );
   }
 
-  // Legend component reusable for bar and line chart
   const Legend = ({
     items,
     colors,
   }: {
     items: string[];
     colors: string[];
-  }) => {
-    return (
-      <View style={styles.legendContainer}>
-        {items.map((item, idx) => (
-          <View key={idx} style={styles.legendItem}>
-            <View
-              style={[styles.legendColor, {backgroundColor: colors[idx]}]}
-            />
-            <Text style={styles.legendLabel}>
-              {item}{' '}
-              {chartType === 'bar'
-                ? `(${formatCurrency(amountByCategory[item])})`
-                : chartType === 'line'
-                ? `(${formatCurrency(dailyAmountMap[item] || 0)})`
-                : ''}
-            </Text>
-          </View>
-        ))}
-      </View>
-    );
-  };
+  }) => (
+    <View style={styles.legendContainer}>
+      {items.map((item, idx) => (
+        <View key={idx} style={styles.legendItem}>
+          <View
+            style={[styles.legendColor, {backgroundColor: colors[idx]}]}
+          />
+          <Text style={styles.legendLabel}>{item}</Text>
+        </View>
+      ))}
+    </View>
+  );
 
   return (
     <ScrollView style={styles.container}>
@@ -264,20 +287,20 @@ const StatisticalScreen = () => {
           ? 'Chi tiêu '
           : 'Thu nhập và chi tiêu '}
         {chartType === 'bar'
-          ? 'theo danh mục (Biểu đồ cột)'
+          ? '7 ngày gần nhất (Biểu đồ cột)'
           : chartType === 'pie'
           ? 'theo danh mục (Biểu đồ tròn)'
-          : 'theo ngày (Biểu đồ đường)'}
+          : '7 ngày gần nhất (Biểu đồ đường)'}
       </Text>
 
-      {chartType === 'bar' && categoryList.length > 0 && (
+      {chartType === 'bar' && (
         <>
           <BarChart
-            data={barChartData}
-            width={screenWidth - 32}
-            height={220}
+            data={barChart7DayData}
+            width={screenWidth - 40}
+            height={350}
             yAxisLabel=""
-            yAxisSuffix=" đ"
+            yAxisSuffix=""
             chartConfig={{
               backgroundColor: '#ffffff',
               backgroundGradientFrom: '#ffffff',
@@ -285,81 +308,76 @@ const StatisticalScreen = () => {
               decimalPlaces: 0,
               color: (opacity = 1) => `rgba(30, 144, 255, ${opacity})`,
               labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-              style: {
-                borderRadius: 16,
-              },
-              propsForDots: {
-                r: '6',
-                strokeWidth: '2',
-                stroke: '#1e90ff',
-              },
+              formatYLabel: formatShortCurrency,
             }}
             verticalLabelRotation={30}
             style={{
               marginVertical: 8,
               borderRadius: 16,
+              marginHorizontal: 16,
             }}
-            fromZero
-          />
-          {/* Legend for bar chart */}
-          <Legend
-            items={categoryList.map(item => item.category)}
-            colors={colorsForLegend}
           />
         </>
       )}
 
-      {chartType === 'pie' && pieChartData.length > 0 && (
+      {chartType === 'pie' && categoryList.length > 0 && (
         <>
           <PieChart
+            hasLegend={false}
             data={pieChartData}
-            width={screenWidth - 32}
+            width={screenWidth - 16}
             height={220}
-            chartConfig={{
-              color: (opacity = 1) => `rgba(30, 144, 255, ${opacity})`,
-            }}
             accessor="amount"
             backgroundColor="transparent"
-            paddingLeft="15"
+            paddingLeft="10"
             absolute
+            chartConfig={{
+              color: () => `#000`,
+              labelColor: () => '#000',
+            }}
+            style={{marginVertical: 8}}
           />
-          {/* Legend for pie chart is built-in, no need extra */}
+          <Legend
+            items={categoryList.map(
+              item => `${item.category} - ${formatCurrency(item.amount)}`,
+            )}
+            colors={pieChartData.map(item => item.color)}
+          />
         </>
       )}
 
-      {chartType === 'line' && sortedDates.length > 0 && (
+      {chartType === 'line' && (
         <>
           <LineChart
             data={lineChartData}
             width={screenWidth - 32}
-            height={220}
+            height={260}
+            yAxisLabel=""
+            yAxisSuffix=""
+            yLabelsOffset={10}
+            formatYLabel={formatShortCurrency}
             chartConfig={{
               backgroundGradientFrom: '#ffffff',
               backgroundGradientTo: '#ffffff',
               decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(30, 144, 255, ${opacity})`,
+              color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
               labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-              style: {
-                borderRadius: 16,
-              },
               propsForDots: {
-                r: '6',
-                strokeWidth: '2',
-                stroke: '#1e90ff',
+                r: '3',
+                strokeWidth: '1',
+                stroke: '#000',
               },
             }}
             bezier
             style={{
               marginVertical: 8,
               borderRadius: 16,
+              marginHorizontal: 16,
             }}
-            fromZero
           />
-          {/* Legend for line chart (dates + values) */}
-          <Legend items={sortedDates} colors={sortedDates.map(() => '#1e90ff')} />
+          <Legend items={lineChartData.legend} colors={['#4caf50', '#f44336']} />
         </>
       )}
-
     </ScrollView>
   );
 };
@@ -369,69 +387,68 @@ export default StatisticalScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 10,
+    paddingHorizontal: 5,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  summaryBox: {
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    padding: 12,
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
     marginBottom: 16,
+  },
+  summaryBox: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 15,
+    paddingVertical: 15,
+    borderRadius: 12,
   },
   label: {
     fontSize: 16,
-    marginBottom: 4,
+    marginVertical: 4,
   },
   pickerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    paddingHorizontal: 16,
   },
   pickerColumn: {
-    flex: 1,
-    marginHorizontal: 4,
+    marginBottom: 12,
   },
   pickerLabel: {
     fontSize: 14,
     fontWeight: '600',
+    marginBottom: 4,
   },
   picker: {
-    width: '100%',
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    textAlign: 'center',
+    backgroundColor: '#eee',
+    borderRadius: 8,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 8,
-    marginTop: 12,
+    marginHorizontal: 16,
+    marginVertical: 8,
   },
   legendContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
+    paddingHorizontal: 16,
     marginTop: 8,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 12,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   legendColor: {
-    width: 16,
-    height: 16,
-    marginRight: 6,
-    borderRadius: 4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
   },
   legendLabel: {
     fontSize: 14,
-    color: '#333',
   },
 });
