@@ -1,7 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Add, Chart, Home, User, Wallet } from 'iconsax-react-nativejs';
 import React from 'react';
-import { AddScreen, HomeScreen, ProfileScreen, StatisticalScreen, WalletScreen } from '../screens/home';
-import { Add, AddSquare, ArchiveSlash, ArchiveTick, Chart, Home, Setting2, StatusUp, User, Wallet } from 'iconsax-react-nativejs';
+import { AddScreen, HomeScreen, SettingScreen, StatisticalScreen, WalletScreen } from '../screens/home';
 
 
 const Tab = createBottomTabNavigator();
@@ -39,7 +39,7 @@ const TabNavigators = () => {
       />
       <Tab.Screen
         name="Cài đặt"
-        component={ProfileScreen}
+        component={SettingScreen}
         options={{
           tabBarIcon: ({color}) => <User color={color} size={23} variant="Bold" />,
         }}

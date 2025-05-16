@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Modal,
   FlatList,
   ScrollView,
+  Pressable,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
@@ -80,34 +81,47 @@ const AddScreen = () => {
   const daysInMonth = Array.from({length: 31}, (_, i) => i + 1);
 
   // Load danh sách ví của user từ firestore (ví dụ)
-  useEffect(() => {
-    const fetchWallets = async () => {
-      try {
-        const currentUser = auth().currentUser;
-        if (!currentUser) return;
+  const fetchWallets = useCallback(async () => {
+    try {
+      const currentUser = auth().currentUser;
+      if (!currentUser) return;
 
-        const walletsSnapshot = await firestore()
-          .collection('users')
-          .doc(currentUser.uid)
-          .collection('wallets')
-          .get();
+      const snapshot = await firestore()
+        .collection('users')
+        .doc(currentUser.uid)
+        .collection('wallets')
+        .get();
 
-        const walletsData = walletsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as {id: string; name: string; icon?: string}[];
+      const walletsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as {id: string; name: string; icon?: string}[];
 
-        setWallets(walletsData);
+      setWallets(walletsData);
 
-        // Nếu có ví thì chọn mặc định ví đầu tiên
-        if (walletsData.length > 0) setSelectedWalletId(walletsData[0].id);
-      } catch (error) {
-        console.error('Lỗi lấy ví:', error);
+      // --- FIX: nếu ví hiện tại đã bị xóa thì bỏ chọn ---
+      if (selectedWalletId && !walletsData.find(w => w.id === selectedWalletId)) {
+        setSelectedWalletId(null);
       }
-    };
 
-    fetchWallets();
-  }, []);
+      // --- FIX: nếu chỉ có 1 ví thì tự chọn ---
+      if (walletsData.length === 1) {
+        setSelectedWalletId(walletsData[0].id);
+      } else if (!selectedWalletId && walletsData.length > 0) {
+        // Nếu chưa chọn ví, chọn ví đầu tiên làm mặc định
+        setSelectedWalletId(walletsData[0].id);
+      }
+
+    } catch (error) {
+      console.error('Lỗi khi lấy ví:', error);
+    }
+  }, [selectedWalletId]);
+
+  useEffect(() => {
+    if (modalWalletVisible) {
+      fetchWallets();
+    }
+  }, [modalWalletVisible, fetchWallets]);
 
   const onSave = async () => {
     if (!category.trim() || !amount.trim()) {
@@ -255,156 +269,195 @@ const AddScreen = () => {
           style={[styles.input, styles.dropdown]}
           onPress={() => setModalRecurrenceVisible(true)}>
           <Text>
-            Tần suất lặp lại:{' '}
-            {recurrenceOptions.find(r => r.value === recurrence)?.label}
-            {recurrence === 'monthly' && recurrenceDay
-              ? ` (Ngày ${recurrenceDay})`
-              : ''}
+            Tùy chọn lặp lại: {
+              recurrenceOptions.find(o => o.value === recurrence)?.label || ''
+            }
           </Text>
           <ArrowDown2 size={20} color="#555" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.saveButton} onPress={onSave}>
-          <Text style={styles.saveButtonText}>Lưu giao dịch</Text>
+        {recurrence === 'monthly' && (
+          <TouchableOpacity
+            style={[styles.input, styles.dropdown]}
+            onPress={() => setModalRecurrenceDayVisible(true)}>
+            <Text>
+              Ngày trong tháng: {recurrenceDay ? recurrenceDay : 'Chọn ngày'}
+            </Text>
+            <ArrowDown2 size={20} color="#555" />
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity style={styles.button} onPress={onSave}>
+          <Text style={styles.buttonText}>Lưu</Text>
         </TouchableOpacity>
       </ScrollView>
 
       {/* Modal chọn ví */}
-      <Modal visible={modalWalletVisible} animationType="slide">
-        <View style={styles.container}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setModalWalletVisible(false)}>
-              <CloseCircle size={28} color="red" />
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={wallets}
-            keyExtractor={item => item.id}
-            renderItem={({item}) => (
-              <TouchableOpacity
-                style={styles.categoryItem}
-                onPress={() => {
-                  setSelectedWalletId(item.id);
-                  setModalWalletVisible(false);
-                }}>
-                <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                  {item.icon ? (
-                    <Icon
-                      name={item.icon}
-                      size={20}
-                      color="#555"
-                      style={{marginRight: 10}}
-                    />
-                  ) : null}
-                  <Text style={styles.categoryItemText}>{item.name}</Text>
-                </View>
-              </TouchableOpacity>
+      <Modal
+        visible={modalWalletVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalWalletVisible(false)}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalWalletVisible(false)}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Chọn ví</Text>
+            {wallets.length === 0 ? (
+              <Text style={{textAlign: 'center', marginVertical: 10}}>
+                Không có ví nào. Vui lòng tạo ví trước.
+              </Text>
+            ) : (
+              <FlatList
+                data={wallets}
+                keyExtractor={item => item.id}
+                renderItem={({item}) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.walletItem,
+                      selectedWalletId === item.id && styles.walletItemSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedWalletId(item.id);
+                      setModalWalletVisible(false);
+                    }}>
+                    <Text
+                      style={[
+                        styles.walletItemText,
+                        selectedWalletId === item.id && {color: '#fff'},
+                      ]}>
+                      {item.name}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              />
             )}
-          />
-        </View>
+          </View>
+        </Pressable>
       </Modal>
 
       {/* Modal chọn danh mục */}
-      <Modal visible={modalVisible} animationType="slide">
-        <View style={styles.container}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <CloseCircle size={28} color="red" />
-            </TouchableOpacity>
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalVisible(false)}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Chọn danh mục</Text>
+            <ScrollView>
+              <Text style={styles.categorySectionTitle}>Thu nhập</Text>
+              {incomeCategories.map(cat => (
+                <TouchableOpacity
+                  key={cat.name}
+                  style={[
+                    styles.categoryItem,
+                    category === cat.name && styles.categoryItemSelected,
+                  ]}
+                  onPress={() => {
+                    setCategory(cat.name);
+                    setIcon(cat.icon);
+                    setType('income');
+                    setModalVisible(false);
+                  }}>
+                  <Icon name={cat.icon} size={20} style={{marginRight: 10}} />
+                  <Text>{cat.name}</Text>
+                </TouchableOpacity>
+              ))}
+              <Text style={styles.categorySectionTitle}>Chi tiêu</Text>
+              {expenseCategories.map(cat => (
+                <TouchableOpacity
+                  key={cat.name}
+                  style={[
+                    styles.categoryItem,
+                    category === cat.name && styles.categoryItemSelected,
+                  ]}
+                  onPress={() => {
+                    setCategory(cat.name);
+                    setIcon(cat.icon);
+                    setType('expense');
+                    setModalVisible(false);
+                  }}>
+                  <Icon name={cat.icon} size={20} style={{marginRight: 10}} />
+                  <Text>{cat.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
-          <FlatList
-            data={categories}
-            keyExtractor={item => item.name}
-            renderItem={({item}) => (
-              <TouchableOpacity
-                style={styles.categoryItem}
-                onPress={() => {
-                  setCategory(item.name);
-                  setIcon(item.icon);
-                  setType(
-                    incomeCategories.some(c => c.name === item.name)
-                      ? 'income'
-                      : 'expense',
-                  );
-                  setModalVisible(false);
-                }}>
-                <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                  <Icon
-                    name={item.icon}
-                    size={20}
-                    color="#555"
-                    style={{marginRight: 10}}
-                  />
-                  <Text style={styles.categoryItemText}>{item.name}</Text>
-                </View>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
+        </Pressable>
       </Modal>
 
-      {/* Modal chọn tần suất lặp lại */}
-      <Modal visible={modalRecurrenceVisible} animationType="slide">
-        <View style={styles.container}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setModalRecurrenceVisible(false)}>
-              <CloseCircle size={28} color="red" />
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={recurrenceOptions}
-            keyExtractor={item => item.value}
-            renderItem={({item}) => (
+      {/* Modal chọn lặp lại */}
+      <Modal
+        visible={modalRecurrenceVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalRecurrenceVisible(false)}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalRecurrenceVisible(false)}>
+          <View style={styles.modalContainer}>
+            {recurrenceOptions.map(opt => (
               <TouchableOpacity
-                style={styles.categoryItem}
-                onPress={() => {
-                  setRecurrence(item.value);
-                  setRecurrenceDay(null);
-                  setModalRecurrenceVisible(false);
-                  if (item.value === 'monthly') {
-                    setModalRecurrenceDayVisible(true);
-                  }
-                }}>
-                <Text style={styles.categoryItemText}>{item.label}</Text>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-      </Modal>
-
-      {/* Modal chọn ngày trong tháng nếu lặp lại hàng tháng */}
-      <Modal visible={modalRecurrenceDayVisible} animationType="slide">
-        <View style={styles.container}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setModalRecurrenceDayVisible(false)}>
-              <CloseCircle size={28} color="red" />
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={daysInMonth}
-            keyExtractor={item => item.toString()}
-            numColumns={7}
-            renderItem={({item}) => (
-              <TouchableOpacity
+                key={opt.value}
                 style={[
-                  styles.dayItem,
-                  recurrenceDay === item && styles.dayItemSelected,
+                  styles.recurrenceItem,
+                  recurrence === opt.value && styles.recurrenceItemSelected,
                 ]}
                 onPress={() => {
-                  setRecurrenceDay(item);
-                  setModalRecurrenceDayVisible(false);
+                  setRecurrence(opt.value);
+                  setRecurrenceDay(null);
+                  setModalRecurrenceVisible(false);
                 }}>
                 <Text
                   style={[
-                    styles.dayText,
-                    recurrenceDay === item && styles.dayTextSelected,
+                    recurrence === opt.value && {color: '#fff', fontWeight: 'bold'},
                   ]}>
-                  {item}
+                  {opt.label}
                 </Text>
               </TouchableOpacity>
-            )}
-          />
-        </View>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Modal chọn ngày lặp lại trong tháng */}
+      <Modal
+        visible={modalRecurrenceDayVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalRecurrenceDayVisible(false)}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setModalRecurrenceDayVisible(false)}>
+          <View style={styles.modalContainer}>
+            <FlatList
+              data={daysInMonth}
+              keyExtractor={item => item.toString()}
+              numColumns={7}
+              renderItem={({item}) => (
+                <TouchableOpacity
+                  style={[
+                    styles.dayItem,
+                    recurrenceDay === item && styles.dayItemSelected,
+                  ]}
+                  onPress={() => {
+                    setRecurrenceDay(item);
+                    setModalRecurrenceDayVisible(false);
+                  }}>
+                  <Text
+                    style={[
+                      recurrenceDay === item && {color: '#fff', fontWeight: 'bold'},
+                    ]}>
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </Pressable>
       </Modal>
     </KeyboardAvoidingView>
   );
@@ -413,73 +466,95 @@ const AddScreen = () => {
 export default AddScreen;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
+  container: {flex: 1, padding: 20, backgroundColor: '#fff'},
+  title: {fontSize: 24, fontWeight: 'bold', marginBottom: 20},
   input: {
     borderWidth: 1,
-    borderColor: '#aaa',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
+    borderColor: '#ddd',
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 15,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
   },
   dropdown: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  saveButton: {
-    backgroundColor: '#1e90ff',
+  button: {
+    backgroundColor: '#3b82f6',
     paddingVertical: 15,
     borderRadius: 8,
     marginTop: 20,
-    marginBottom: 40,
   },
-  saveButtonText: {
-    textAlign: 'center',
-    color: '#fff',
-    fontWeight: '600',
+  buttonText: {color: '#fff', fontWeight: 'bold', fontSize: 18, textAlign: 'center'},
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '60%',
+  },
+  modalTitle: {fontSize: 20, fontWeight: 'bold', marginBottom: 10},
+  walletItem: {
+    padding: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginBottom: 8,
+  },
+  walletItemSelected: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#3b82f6',
+  },
+  walletItemText: {
     fontSize: 16,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    padding: 10,
+  categorySectionTitle: {
+    fontWeight: 'bold',
+    fontSize: 18,
+    marginTop: 10,
+    marginBottom: 5,
   },
   categoryItem: {
-    padding: 14,
-    borderBottomWidth: 1,
-    borderColor: '#eee',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 6,
+    marginBottom: 8,
   },
-  categoryItemText: {
-    fontSize: 16,
+  categoryItemSelected: {
+    backgroundColor: '#3b82f6',
+  },
+  recurrenceItem: {
+    padding: 12,
+    borderRadius: 6,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  recurrenceItemSelected: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#3b82f6',
   },
   dayItem: {
-    width: 40,
-    height: 40,
+    flex: 1,
     margin: 4,
-    borderRadius: 20,
-    backgroundColor: '#eee',
-    justifyContent: 'center',
+    padding: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
     alignItems: 'center',
   },
   dayItemSelected: {
-    backgroundColor: '#1e90ff',
-  },
-  dayText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  dayTextSelected: {
-    color: '#fff',
-    fontWeight: 'bold',
+    backgroundColor: '#3b82f6',
+    borderColor: '#3b82f6',
   },
 });
