@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -11,49 +11,49 @@ import {
   Modal,
   FlatList,
   ScrollView,
-  FlatListProps,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
-import { ArrowDown2, CloseCircle } from 'iconsax-react-nativejs';
+import auth from '@react-native-firebase/auth';
+import {ArrowDown2, CloseCircle} from 'iconsax-react-nativejs';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const incomeCategories = [
-  { name: 'Lương', icon: 'cash' },
-  { name: 'Thưởng', icon: 'gift' },
-  { name: 'Kinh doanh', icon: 'briefcase' },
-  { name: 'Đầu tư', icon: 'chart-line' },
-  { name: 'Tiết kiệm', icon: 'piggy-bank' },
+  {name: 'Lương', icon: 'cash'},
+  {name: 'Thưởng', icon: 'gift'},
+  {name: 'Kinh doanh', icon: 'briefcase'},
+  {name: 'Đầu tư', icon: 'chart-line'},
+  {name: 'Tiết kiệm', icon: 'piggy-bank'},
 ];
 
 const expenseCategories = [
-  { name: 'Ăn uống', icon: 'silverware-fork-knife' },
-  { name: 'Cafe / Trà sữa', icon: 'coffee' },
-  { name: 'Mua sắm', icon: 'shopping' },
-  { name: 'Giải trí', icon: 'gamepad-variant' },
-  { name: 'Điện nước', icon: 'flash' },
-  { name: 'Internet', icon: 'wifi' },
-  { name: 'Thuê nhà', icon: 'home-city' },
-  { name: 'Di chuyển', icon: 'bus' },
-  { name: 'Xăng xe', icon: 'gas-station' },
-  { name: 'Sửa xe', icon: 'tools' },
-  { name: 'Y tế', icon: 'hospital-box' },
-  { name: 'Bảo hiểm', icon: 'shield-check' },
-  { name: 'Giáo dục', icon: 'school' },
-  { name: 'Con cái', icon: 'baby-face' },
-  { name: 'Gia đình', icon: 'account-group' },
-  { name: 'Quà tặng', icon: 'gift-outline' },
-  { name: 'Du lịch', icon: 'airplane' },
-  { name: 'Từ thiện', icon: 'hand-heart' },
-  { name: 'Khác', icon: 'dots-horizontal' },
+  {name: 'Ăn uống', icon: 'silverware-fork-knife'},
+  {name: 'Cafe / Trà sữa', icon: 'coffee'},
+  {name: 'Mua sắm', icon: 'shopping'},
+  {name: 'Giải trí', icon: 'gamepad-variant'},
+  {name: 'Điện nước', icon: 'flash'},
+  {name: 'Internet', icon: 'wifi'},
+  {name: 'Thuê nhà', icon: 'home-city'},
+  {name: 'Di chuyển', icon: 'bus'},
+  {name: 'Xăng xe', icon: 'gas-station'},
+  {name: 'Sửa xe', icon: 'tools'},
+  {name: 'Y tế', icon: 'hospital-box'},
+  {name: 'Bảo hiểm', icon: 'shield-check'},
+  {name: 'Giáo dục', icon: 'school'},
+  {name: 'Con cái', icon: 'baby-face'},
+  {name: 'Gia đình', icon: 'account-group'},
+  {name: 'Quà tặng', icon: 'gift-outline'},
+  {name: 'Du lịch', icon: 'airplane'},
+  {name: 'Từ thiện', icon: 'hand-heart'},
+  {name: 'Khác', icon: 'dots-horizontal'},
 ];
 
 const categories = [...incomeCategories, ...expenseCategories];
 
 const recurrenceOptions = [
-  { label: 'Không lặp lại', value: 'none' },
-  { label: 'Hàng ngày', value: 'daily' },
-  { label: 'Hàng tuần', value: 'weekly' },
-  { label: 'Hàng tháng', value: 'monthly' },
+  {label: 'Không lặp lại', value: 'none'},
+  {label: 'Hàng ngày', value: 'daily'},
+  {label: 'Hàng tuần', value: 'weekly'},
+  {label: 'Hàng tháng', value: 'monthly'},
 ];
 
 const AddScreen = () => {
@@ -62,12 +62,14 @@ const AddScreen = () => {
   const [icon, setIcon] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
-  const [tags, setTags] = useState(''); // Chuỗi tag phân cách bằng dấu phẩy
+  const [tags, setTags] = useState('');
   const [recurrence, setRecurrence] = useState('none');
-  const [recurrenceDay, setRecurrenceDay] = useState<number | null>(null); // Ngày định kỳ (1-31)
+  const [recurrenceDay, setRecurrenceDay] = useState<number | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalRecurrenceVisible, setModalRecurrenceVisible] = useState(false);
   const [modalRecurrenceDayVisible, setModalRecurrenceDayVisible] = useState(false);
+
+  const daysInMonth = Array.from({length: 31}, (_, i) => i + 1);
 
   const onSave = async () => {
     if (!category.trim() || !amount.trim()) {
@@ -86,33 +88,53 @@ const AddScreen = () => {
       return;
     }
 
-    // Xử lý tags: tách chuỗi, loại bỏ khoảng trắng thừa và loại bỏ tag rỗng
     const tagsArray = tags
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter((tag) => tag.length > 0);
+      .split(', ')
+      .map(tag => tag.trim())
+      .filter(tag => tag.length > 0);
 
-    // Nếu lặp lại theo tháng thì phải chọn ngày
     if (recurrence === 'monthly' && !recurrenceDay) {
       Alert.alert('Lỗi', 'Vui lòng chọn ngày trong tháng để lặp lại.');
       return;
     }
 
     try {
-      await firestore().collection('transactions').add({
+      const currentUser = auth().currentUser;
+      if (!currentUser) {
+        Alert.alert('Lỗi', 'Bạn chưa đăng nhập.');
+        return;
+      }
+
+      const userDoc = await firestore()
+        .collection('users')
+        .where('email', '==', currentUser.email)
+        .limit(1)
+        .get();
+
+      if (userDoc.empty) {
+        Alert.alert('Lỗi', 'Tài khoản của bạn không tồn tại trong hệ thống.');
+        return;
+      }
+
+      const userId = currentUser.uid;
+
+      await firestore()
+      .collection('users')
+      .doc(userId)
+      .collection('transactions').add({
         type,
         category,
         icon,
         amount: amountNumber,
         note,
-        tags: tagsArray, // Lưu mảng tags
-        recurrence, // Lưu thông tin lặp lại
-        recurrenceDay, // Lưu ngày định kỳ nếu có
+        tags: tagsArray,
+        recurrence,
+        recurrenceDay,
         createdAt: firestore.FieldValue.serverTimestamp(),
       });
 
       Alert.alert('Thành công', 'Giao dịch đã được thêm.');
-      // Reset form
+
       setCategory('');
       setAmount('');
       setNote('');
@@ -127,44 +149,42 @@ const AddScreen = () => {
     }
   };
 
-  const daysInMonth = Array.from({ length: 31 }, (_, i) => i + 1);
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.select({ ios: 'padding', android: undefined })}
-    >
+      behavior={Platform.select({ios: 'padding', android: undefined})}>
       <ScrollView keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Thêm giao dịch</Text>
 
-        {/* Chọn danh mục */}
         <TouchableOpacity
           style={[styles.input, styles.dropdown]}
-          onPress={() => setModalVisible(true)}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          onPress={() => setModalVisible(true)}>
+          <View style={{flexDirection: 'row', alignItems: 'center'}}>
             {icon ? (
-              <Icon name={icon} size={20} color="#555" style={{ marginRight: 8 }} />
+              <Icon
+                name={icon}
+                size={20}
+                color="#555"
+                style={{marginRight: 8}}
+              />
             ) : null}
             <Text>{category || 'Chọn danh mục'}</Text>
           </View>
           <ArrowDown2 size={20} color="#555" />
         </TouchableOpacity>
 
-        {/* Nhập số tiền */}
         <TextInput
           style={styles.input}
           placeholder="Số tiền"
           keyboardType="numeric"
           value={amount}
-          onChangeText={(text) => {
+          onChangeText={text => {
             const raw = text.replace(/[^0-9]/g, '');
             const formatted = raw.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
             setAmount(formatted);
           }}
         />
 
-        {/* Nhập ghi chú */}
         <TextInput
           style={styles.input}
           placeholder="Ghi chú (tùy chọn)"
@@ -172,7 +192,6 @@ const AddScreen = () => {
           onChangeText={setNote}
         />
 
-        {/* Nhập tags */}
         <TextInput
           style={styles.input}
           placeholder="Thêm thẻ (tags), cách nhau bằng dấu phẩy"
@@ -180,19 +199,19 @@ const AddScreen = () => {
           onChangeText={setTags}
         />
 
-        {/* Chọn tần suất lặp lại */}
         <TouchableOpacity
           style={[styles.input, styles.dropdown]}
-          onPress={() => setModalRecurrenceVisible(true)}
-        >
+          onPress={() => setModalRecurrenceVisible(true)}>
           <Text>
-            Tần suất lặp lại: {recurrenceOptions.find((r) => r.value === recurrence)?.label}
-            {recurrence === 'monthly' && recurrenceDay ? ` (Ngày ${recurrenceDay})` : ''}
+            Tần suất lặp lại:{' '}
+            {recurrenceOptions.find(r => r.value === recurrence)?.label}
+            {recurrence === 'monthly' && recurrenceDay
+              ? ` (Ngày ${recurrenceDay})`
+              : ''}
           </Text>
           <ArrowDown2 size={20} color="#555" />
         </TouchableOpacity>
 
-        {/* Nút lưu */}
         <TouchableOpacity style={styles.saveButton} onPress={onSave}>
           <Text style={styles.saveButtonText}>Lưu giao dịch</Text>
         </TouchableOpacity>
@@ -200,105 +219,110 @@ const AddScreen = () => {
 
       {/* Modal chọn danh mục */}
       <Modal visible={modalVisible} animationType="slide">
-        <View style={styles.modalHeader}>
-          <TouchableOpacity onPress={() => setModalVisible(false)}>
-            <CloseCircle size={28} color="#555" />
-          </TouchableOpacity>
-        </View>
-
-        <FlatList
-          data={categories}
-          keyExtractor={(item, index) => index.toString()}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.categoryItem}
-              onPress={() => {
-                setCategory(item.name);
-                setIcon(item.icon);
-                setType(
-                  incomeCategories.find((c) => c.name === item.name) ? 'income' : 'expense'
-                );
-                setModalVisible(false);
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Icon name={item.icon} size={22} color="#333" style={{ marginRight: 12 }} />
-                <Text style={styles.categoryItemText}>{item.name}</Text>
-              </View>
+        <View style={styles.container}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <CloseCircle size={28} color="red" />
             </TouchableOpacity>
-          )}
-        />
+          </View>
+          <FlatList
+            data={categories}
+            keyExtractor={item => item.name}
+            renderItem={({item}) => (
+              <TouchableOpacity
+                style={styles.categoryItem}
+                onPress={() => {
+                  setCategory(item.name);
+                  setIcon(item.icon);
+                  setType(
+                    incomeCategories.some(c => c.name === item.name)
+                      ? 'income'
+                      : 'expense',
+                  );
+                  setModalVisible(false);
+                }}>
+                <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                  <Icon
+                    name={item.icon}
+                    size={20}
+                    color="#555"
+                    style={{marginRight: 10}}
+                  />
+                  <Text style={styles.categoryItemText}>{item.name}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
       </Modal>
 
       {/* Modal chọn tần suất lặp lại */}
-      <Modal visible={modalRecurrenceVisible} animationType="slide" transparent>
+      <Modal visible={modalRecurrenceVisible} transparent animationType="fade">
         <View style={styles.modalRecurrenceContainer}>
           <View style={styles.modalRecurrenceContent}>
             <Text style={styles.modalTitle}>Chọn tần suất lặp lại</Text>
-            {recurrenceOptions.map((option) => (
+            {recurrenceOptions.map(option => (
               <TouchableOpacity
                 key={option.value}
                 style={[
                   styles.recurrenceOption,
-                  recurrence === option.value && styles.recurrenceOptionSelected,
+                  recurrence === option.value &&
+                    styles.recurrenceOptionSelected,
                 ]}
                 onPress={() => {
                   setRecurrence(option.value);
                   setModalRecurrenceVisible(false);
-                  if (option.value === 'monthly') {
+                  if (option.value === 'monthly')
                     setModalRecurrenceDayVisible(true);
-                  } else {
-                    setRecurrenceDay(null);
-                  }
-                }}
-              >
+                }}>
                 <Text>{option.label}</Text>
               </TouchableOpacity>
             ))}
             <TouchableOpacity
               style={styles.modalCloseButton}
-              onPress={() => setModalRecurrenceVisible(false)}
-            >
-              <Text style={{ color: '#007AFF' }}>Hủy</Text>
+              onPress={() => setModalRecurrenceVisible(false)}>
+              <Text style={{color: 'red'}}>Hủy</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* Modal chọn ngày định kỳ (nếu monthly) */}
-      <Modal visible={modalRecurrenceDayVisible} animationType="slide" transparent>
+      {/* Modal chọn ngày trong tháng */}
+      <Modal
+        visible={modalRecurrenceDayVisible}
+        transparent
+        animationType="fade">
         <View style={styles.modalRecurrenceContainer}>
-          <View style={[styles.modalRecurrenceContent, { maxHeight: 300 }]}>
-            <Text style={styles.modalTitle}>Chọn ngày trong tháng để lặp lại</Text>
-            <FlatList
-              data={daysInMonth}
-              keyExtractor={(item) => item.toString()}
-              numColumns={7}
-              renderItem={({ item }) => {
-                const selected = recurrenceDay === item;
-                return (
-                  <TouchableOpacity
-                    style={[
-                      styles.dayItem,
-                      selected && { backgroundColor: '#007AFF' },
-                    ]}
-                    onPress={() => {
-                      setRecurrenceDay(item);
-                      setModalRecurrenceDayVisible(false);
-                    }}
-                  >
-                    <Text style={[selected && { color: 'white', fontWeight: 'bold' }]}>
-                      {item}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              }}
-            />
+          <View style={[styles.modalRecurrenceContent, {alignItems: 'center'}]}>
+            <Text style={styles.modalTitle}>Chọn ngày trong tháng</Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                justifyContent: 'center',
+              }}>
+              {daysInMonth.map(day => (
+                <TouchableOpacity
+                  key={day}
+                  style={[
+                    styles.dayItem,
+                    recurrenceDay === day && {backgroundColor: '#007AFF'},
+                  ]}
+                  onPress={() => {
+                    setRecurrenceDay(day);
+                    setModalRecurrenceDayVisible(false);
+                  }}>
+                  <Text
+                    style={{color: recurrenceDay === day ? '#fff' : '#000'}}>
+                    {day}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <TouchableOpacity
               style={styles.modalCloseButton}
-              onPress={() => setModalRecurrenceDayVisible(false)}
-            >
-              <Text style={{ color: '#007AFF' }}>Hủy</Text>
+              onPress={() => setModalRecurrenceDayVisible(false)}>
+              <Text style={{color: 'red'}}>Hủy</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -310,8 +334,17 @@ const AddScreen = () => {
 export default AddScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+  container: {
+    flex: 1, 
+    backgroundColor: '#fff',
+    paddingHorizontal: 10
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -333,7 +366,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 30,
   },
-  saveButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16, textAlign: 'center' },
+  saveButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+    textAlign: 'center',
+  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -346,7 +384,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  categoryItemText: { fontSize: 16 },
+  categoryItemText: {fontSize: 16},
   modalRecurrenceContainer: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -359,7 +397,12 @@ const styles = StyleSheet.create({
     width: '90%',
     padding: 16,
   },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12, textAlign: 'center' },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
   recurrenceOption: {
     paddingVertical: 12,
     paddingHorizontal: 16,

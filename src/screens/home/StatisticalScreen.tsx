@@ -11,6 +11,8 @@ import firestore from '@react-native-firebase/firestore';
 import {BarChart, PieChart, LineChart} from 'react-native-chart-kit';
 import {Picker} from '@react-native-picker/picker';
 import dayjs from 'dayjs';
+import auth from '@react-native-firebase/auth';
+import {appColors} from '../../constants/appColors';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -23,7 +25,10 @@ const StatisticalScreen = () => {
   const [typeFilter, setTypeFilter] = useState('both');
 
   useEffect(() => {
+    const userId = auth().currentUser?.uid;
     const unsubscribe = firestore()
+      .collection('users')
+      .doc(userId)
       .collection('transactions')
       .onSnapshot(snapshot => {
         const data = snapshot.docs.map(doc => ({
@@ -96,8 +101,7 @@ const StatisticalScreen = () => {
     }),
   );
 
-  const formatCurrency = (num: number) =>
-    num.toLocaleString('vi-VN') + ' đ';
+  const formatCurrency = (num: number) => num.toLocaleString('vi-VN') + ' đ';
 
   const formatShortCurrency = (label: string): string => {
     const num = parseFloat(label);
@@ -149,10 +153,12 @@ const StatisticalScreen = () => {
     {},
   );
 
-  // ➕ Group transactions for last 7 days
-  const last7Days = Array.from({ length: 7 }).map((_, i) =>
-  dayjs().subtract(2 - i, 'day').format('DD/MM'),
-);
+  // --- Tạo dữ liệu ngày trong 7 ngày gần nhất ---
+  const last7Days = Array.from({length: 7}).map((_, i) =>
+    dayjs()
+      .subtract(2 - i, 'day')
+      .format('DD/MM'),
+  );
 
   const dailyData: Record<string, {income: number; expense: number}> = {};
   last7Days.forEach(date => {
@@ -184,19 +190,6 @@ const StatisticalScreen = () => {
     legend: ['Thu nhập', 'Chi tiêu'],
   };
 
-  const barChart7DayData = {
-    labels: last7Days,
-    datasets: [
-      {
-        data: last7Days.map(date => {
-          if (typeFilter === 'income') return dailyData[date].income;
-          if (typeFilter === 'expense') return dailyData[date].expense;
-          return dailyData[date].income - dailyData[date].expense;
-        }),
-      },
-    ],
-  };
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -205,19 +198,11 @@ const StatisticalScreen = () => {
     );
   }
 
-  const Legend = ({
-    items,
-    colors,
-  }: {
-    items: string[];
-    colors: string[];
-  }) => (
+  const Legend = ({items, colors}: {items: string[]; colors: string[]}) => (
     <View style={styles.legendContainer}>
       {items.map((item, idx) => (
         <View key={idx} style={styles.legendItem}>
-          <View
-            style={[styles.legendColor, {backgroundColor: colors[idx]}]}
-          />
+          <View style={[styles.legendColor, {backgroundColor: colors[idx]}]} />
           <Text style={styles.legendLabel}>{item}</Text>
         </View>
       ))}
@@ -266,116 +251,151 @@ const StatisticalScreen = () => {
             <Picker.Item label="Chi tiêu" value="expense" />
           </Picker>
         </View>
-
-        <View style={styles.pickerColumn}>
-          <Text style={styles.pickerLabel}>Biểu đồ:</Text>
-          <Picker
-            selectedValue={chartType}
-            style={styles.picker}
-            onValueChange={value => setChartType(value)}>
-            <Picker.Item label="Biểu đồ cột" value="bar" />
-            <Picker.Item label="Biểu đồ tròn" value="pie" />
-            <Picker.Item label="Biểu đồ đường" value="line" />
-          </Picker>
-        </View>
       </View>
 
-      <Text style={styles.sectionTitle}>
-        {typeFilter === 'income'
-          ? 'Thu nhập '
-          : typeFilter === 'expense'
-          ? 'Chi tiêu '
-          : 'Thu nhập và chi tiêu '}
-        {chartType === 'bar'
-          ? '7 ngày gần nhất (Biểu đồ cột)'
-          : chartType === 'pie'
-          ? 'theo danh mục (Biểu đồ tròn)'
-          : '7 ngày gần nhất (Biểu đồ đường)'}
-      </Text>
+      <View style={styles.pickerColumn}>
+        <Text style={styles.pickerLabel}>Loại biểu đồ:</Text>
+        <Picker
+          selectedValue={chartType}
+          style={styles.picker}
+          onValueChange={value => setChartType(value)}>
+          <Picker.Item label="Biểu đồ cột" value="bar" />
+          <Picker.Item label="Biểu đồ tròn" value="pie" />
+          <Picker.Item label="Biểu đồ đường" value="line" />
+        </Picker>
+      </View>
 
       {chartType === 'bar' && (
         <>
-          <BarChart
-            data={barChart7DayData}
-            width={screenWidth - 40}
-            height={350}
-            yAxisLabel=""
-            yAxisSuffix=""
-            chartConfig={{
-              backgroundColor: '#ffffff',
-              backgroundGradientFrom: '#ffffff',
-              backgroundGradientTo: '#ffffff',
-              decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(30, 144, 255, ${opacity})`,
-              labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-              formatYLabel: formatShortCurrency,
-            }}
-            verticalLabelRotation={30}
-            style={{
-              marginVertical: 8,
-              borderRadius: 16,
-              marginHorizontal: 16,
-            }}
+          <ScrollView horizontal style={{marginTop: 15}}>
+            <BarChart
+              data={barChartData}
+              width={Math.max(last7Days.length * 60, screenWidth - 20)}
+              height={220}
+              yAxisLabel=""
+              yAxisSuffix=" đ"
+              chartConfig={{
+                backgroundColor: '#fff',
+                backgroundGradientFrom: '#fff',
+                backgroundGradientTo: '#fff',
+                decimalPlaces: 0,
+                
+                color: (opacity = 1) => `rgba(34, 128, 176, ${opacity})`,
+                labelColor: () => '#333',
+                formatYLabel: formatShortCurrency,
+                style: {borderRadius: 16},
+                propsForDots: {
+                  r: '4',
+                  strokeWidth: '2',
+                  stroke: '#4caf50',
+                },
+                propsForBackgroundLines: {strokeWidth: 0.5, stroke: '#ccc'},
+              }}
+              fromZero
+              showValuesOnTopOfBars
+              withInnerLines={true}
+              withHorizontalLabels={true}
+              withVerticalLabels={true}
+              flatColor={true}
+              
+            />
+          </ScrollView>
+
+          <Legend
+            items={['Thu nhập', 'Chi tiêu']}
+            colors={['#4caf50', '#f44336']}
           />
+
+          {/* --- Hiển thị chú thích chi tiết thu chi từng ngày --- */}
+          <View style={styles.dailyDetailContainer}>
+            {last7Days.map(date => (
+              <View key={date} style={styles.dailyDetailItem}>
+                <Text style={styles.dailyDate}>{date}</Text>
+                <Text style={[styles.dailyIncome, {color: '#4caf50'}]}>
+                  Thu: {formatCurrency(dailyData[date].income)}
+                </Text>
+                <Text style={[styles.dailyExpense, {color: '#f44336'}]}>
+                  Chi: {formatCurrency(dailyData[date].expense)}
+                </Text>
+              </View>
+            ))}
+          </View>
         </>
       )}
 
-      {chartType === 'pie' && categoryList.length > 0 && (
+      {chartType === 'pie' && (
         <>
           <PieChart
-            hasLegend={false}
             data={pieChartData}
-            width={screenWidth - 16}
+            width={screenWidth - 20}
             height={220}
+            hasLegend={false}
+            chartConfig={{
+              color: () => `rgba(0,0,0,0.7)`,
+            }}
             accessor="amount"
             backgroundColor="transparent"
-            paddingLeft="10"
+            paddingLeft="15"
             absolute
-            chartConfig={{
-              color: () => `#000`,
-              labelColor: () => '#000',
-            }}
-            style={{marginVertical: 8}}
           />
+
           <Legend
-            items={categoryList.map(
-              item => `${item.category} - ${formatCurrency(item.amount)}`,
-            )}
-            colors={pieChartData.map(item => item.color)}
+            items={categoryList.map(c => c.category)}
+            colors={categoryList.map(c => categoryColorsMap[c.category])}
           />
         </>
       )}
 
       {chartType === 'line' && (
         <>
-          <LineChart
-            data={lineChartData}
-            width={screenWidth - 32}
-            height={260}
-            yAxisLabel=""
-            yAxisSuffix=""
-            yLabelsOffset={10}
-            formatYLabel={formatShortCurrency}
-            chartConfig={{
-              backgroundGradientFrom: '#ffffff',
-              backgroundGradientTo: '#ffffff',
-              decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-              labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-              propsForDots: {
-                r: '3',
-                strokeWidth: '1',
-                stroke: '#000',
-              },
-            }}
-            bezier
-            style={{
-              marginVertical: 8,
-              borderRadius: 16,
-              marginHorizontal: 16,
-            }}
+          <ScrollView horizontal style={{marginTop: 15}}>
+            <LineChart
+              data={lineChartData}
+              width={Math.max(last7Days.length * 60, screenWidth - 20)}
+              height={220}
+              yAxisLabel=""
+              yAxisSuffix=" đ"
+              chartConfig={{
+                backgroundColor: '#fff',
+                backgroundGradientFrom: '#fff',
+                backgroundGradientTo: '#fff',
+                decimalPlaces: 0,
+                color: (opacity = 1) => `rgba(0, 150, 136, ${opacity})`,
+                labelColor: () => '#333',
+                style: {borderRadius: 16},
+                propsForDots: {
+                  r: '4',
+                  strokeWidth: '2',
+                  stroke: '#4caf50',
+                },
+                propsForBackgroundLines: {strokeWidth: 0.5, stroke: '#ccc'},
+              }}
+              bezier
+              fromZero
+              segments={6}
+              formatYLabel={formatShortCurrency}
+            />
+          </ScrollView>
+
+          <Legend
+            items={lineChartData.legend}
+            colors={['#4caf50', '#f44336']}
           />
-          <Legend items={lineChartData.legend} colors={['#4caf50', '#f44336']} />
+
+          {/* --- Hiển thị chú thích chi tiết thu chi từng ngày --- */}
+          <View style={styles.dailyDetailContainer}>
+            {last7Days.map(date => (
+              <View key={date} style={styles.dailyDetailItem}>
+                <Text style={styles.dailyDate}>{date}</Text>
+                <Text style={[styles.dailyIncome, {color: '#4caf50'}]}>
+                  Thu: {formatCurrency(dailyData[date].income)}
+                </Text>
+                <Text style={[styles.dailyExpense, {color: '#f44336'}]}>
+                  Chi: {formatCurrency(dailyData[date].expense)}
+                </Text>
+              </View>
+            ))}
+          </View>
         </>
       )}
     </ScrollView>
@@ -386,69 +406,96 @@ export default StatisticalScreen;
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    paddingHorizontal: 5,
+    flex: 1, 
+    paddingHorizontal: 10, 
+    backgroundColor: '#f5f5f5'
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center'
   },
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#222',
     textAlign: 'center',
-    marginBottom: 16,
   },
   summaryBox: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 15,
-    paddingVertical: 15,
-    borderRadius: 12,
+    backgroundColor: appColors.white,
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 15,
+    elevation: 1,
   },
   label: {
-    fontSize: 16,
-    marginVertical: 4,
+    fontSize: 16, 
+    marginBottom: 5, 
+    color: appColors.text
   },
   pickerRow: {
     flexDirection: 'column',
-    paddingHorizontal: 16,
+    justifyContent: 'space-between',
+    marginBottom: 15,
   },
   pickerColumn: {
-    marginBottom: 12,
+    flex: 1, 
+    marginRight: 10
   },
   pickerLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontSize: 16, 
+    marginBottom: 5, 
+    color: '#555'
   },
   picker: {
-    backgroundColor: '#eee',
-    borderRadius: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginHorizontal: 16,
-    marginVertical: 8,
+    backgroundColor: '#fff',
+    borderRadius: 6,
   },
   legendContainer: {
-    flexDirection: 'column',
-    paddingHorizontal: 16,
-    marginTop: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 10,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginRight: 15,
+    marginBottom: 5,
   },
   legendColor: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 8,
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    marginRight: 6,
   },
   legendLabel: {
     fontSize: 14,
+    color: '#333',
+  },
+  dailyDetailContainer: {
+    marginTop: 10,
+    marginBottom: 10,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 10,
+  },
+  dailyDetailItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  dailyDate: {
+    fontWeight: 'bold',
+    color: '#222',
+  },
+  dailyIncome: {
+    flex: 1, 
+    textAlign: 'left', 
+    marginLeft: 20
+  },
+  dailyExpense: {
+    flex: 1, 
+    textAlign: 'left', 
+    marginLeft: 20
   },
 });

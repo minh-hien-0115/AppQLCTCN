@@ -9,6 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
+import firestore from '@react-native-firebase/firestore';
 import Feather from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
@@ -59,8 +60,19 @@ const SignUpScreen = ({ navigation }: any) => {
     }
 
     try {
-      await auth().createUserWithEmailAndPassword(email, password);
+      const userCredential = await auth().createUserWithEmailAndPassword(email, password);
+      const user = userCredential.user;
+
+      // Lưu thông tin người dùng vào Firestore
+      await firestore().collection('users').doc(user.uid).set({
+        uid: user.uid,
+        fullname: fullname,
+        email: user.email,
+        createdAt: firestore.FieldValue.serverTimestamp(),
+      });
+
       Alert.alert('Thành công', 'Đăng ký thành công');
+      navigation.navigate('Login');
     } catch (error: any) {
       console.log('Signup error:', error);
       Alert.alert('Lỗi đăng ký', error.message || 'Đã xảy ra lỗi');

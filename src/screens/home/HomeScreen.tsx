@@ -16,25 +16,49 @@ const HomeScreen = () => {
   const [transactions, setTransactions] = useState<any[]>([]);
 
   useEffect(() => {
-    const user = auth().currentUser;
-    if (user) {
-      setDisplayName(user.displayName || '');
-    }
+  const userId = auth().currentUser?.uid;
+  if (!userId) {
+    setDisplayName('Người dùng');
+    setLoading(false);
+    return;
+  }
 
-    const unsubscribe = firestore()
-      .collection('transactions')
-      .orderBy('createdAt', 'desc')
-      .onSnapshot(snapshot => {
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setTransactions(data as any[]);
-        setLoading(false);
-      });
+  // Lấy tên người dùng từ document users/{userId}
+  firestore()
+    .collection('users')
+    .doc(userId)
+    .get()
+    .then(docSnapshot => {
+      if (docSnapshot.exists()) {
+        const data = docSnapshot.data();
+        setDisplayName(data?.fullname || 'Người dùng');
+      } else {
+        setDisplayName('Người dùng');
+      }
+    })
+    .catch(error => {
+      console.error('Lỗi khi lấy thông tin người dùng:', error);
+      setDisplayName('Người dùng');
+    });
 
-    return () => unsubscribe();
-  }, []);
+  // Lấy transactions từ users/{userId}/transactions
+  const unsubscribe = firestore()
+    .collection('users')
+    .doc(userId)
+    .collection('transactions')
+    .orderBy('createdAt', 'desc')
+    .onSnapshot(snapshot => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setTransactions(data as any[]);
+      setLoading(false);
+    });
+
+  return () => unsubscribe();
+}, []);
+
 
   const totalIncome = transactions
     .filter(item => item.type === 'income')
@@ -75,9 +99,7 @@ const HomeScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.welcome}>
-        Xin chào, {displayName || 'Người dùng'}!
-      </Text>
+      <Text style={styles.welcome}>Xin chào, {displayName}!</Text>
 
       <View style={styles.summaryBox}>
         <Text style={styles.label}>Số dư hiện tại</Text>
@@ -134,7 +156,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 10,
     backgroundColor: '#fafafa',
-    marginTop: 30
+    marginTop: 30,
   },
   welcome: {
     fontSize: 18,
