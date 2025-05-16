@@ -8,15 +8,11 @@ import {
   Modal,
   TouchableOpacity,
   Pressable,
-  Image,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { AvatarComponents } from '../../components';
-
-// Nếu bạn có component AvatarComponents riêng, bạn có thể chỉnh sửa nó nhận prop uri
-// hoặc bạn có thể thay bằng Image như ví dụ bên dưới
 
 const DEFAULT_AVATAR = 'https://i.pravatar.cc/150?img=3';
 
@@ -38,7 +34,6 @@ const HomeScreen = () => {
       return;
     }
 
-    // Lấy thông tin user, gồm fullname và avatar
     firestore()
       .collection('users')
       .doc(userId)
@@ -68,9 +63,24 @@ const HomeScreen = () => {
           id: doc.id,
           ...doc.data(),
         }));
+
         setWallets(walletList);
-        if (!selectedWallet && walletList.length > 0) {
+
+        if (walletList.length === 1) {
           setSelectedWallet(walletList[0]);
+          setWalletModalVisible(false);
+        }
+
+        if (walletList.length > 1 && !selectedWallet) {
+          setWalletModalVisible(true);
+        }
+
+        if (
+          selectedWallet &&
+          !walletList.some(w => w.id === selectedWallet.id)
+        ) {
+          setSelectedWallet(null);
+          setWalletModalVisible(true);
         }
       });
 
@@ -78,7 +88,11 @@ const HomeScreen = () => {
   }, [userId]);
 
   useEffect(() => {
-    if (!userId || !selectedWallet) return;
+    if (!userId || !selectedWallet) {
+      setTransactions([]);
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     const unsubscribe = firestore()
@@ -108,8 +122,6 @@ const HomeScreen = () => {
     .filter(item => item.type === 'expense')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const balance = totalIncome - totalExpense;
-
   const formatCurrency = (num: number) => {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' đ';
   };
@@ -137,11 +149,38 @@ const HomeScreen = () => {
     );
   };
 
+  if (!selectedWallet && wallets.length > 1) {
+    return (
+      <View style={styles.container}>
+        <Modal visible={walletModalVisible} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Chọn ví để tiếp tục</Text>
+              </View>
+              {wallets.map(wallet => (
+                <Pressable
+                  key={wallet.id}
+                  style={styles.walletItem}
+                  onPress={() => {
+                    setSelectedWallet(wallet);
+                    setWalletModalVisible(false);
+                  }}>
+                  <Text style={styles.walletName}>{wallet.name}</Text>
+                  <Text>{formatCurrency(wallet.balance)}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </Modal>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.welcomeRow}>
         <Text style={styles.welcome}>Xin chào, {displayName}</Text>
-        {/* Hiển thị avatar lấy từ Firebase hoặc mặc định */}
         <AvatarComponents uri={avatarUri} />
       </View>
 
@@ -157,7 +196,7 @@ const HomeScreen = () => {
         <Text style={styles.balance}>
           {selectedWallet
             ? formatCurrency(selectedWallet.balance)
-            : formatCurrency(balance)}
+            : formatCurrency(0)}
         </Text>
 
         <View style={styles.row}>
@@ -219,18 +258,24 @@ const HomeScreen = () => {
                 <Icon name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
-            {wallets.map(wallet => (
-              <Pressable
-                key={wallet.id}
-                style={styles.walletItem}
-                onPress={() => {
-                  setSelectedWallet(wallet);
-                  setWalletModalVisible(false);
-                }}>
-                <Text style={styles.walletName}>{wallet.name}</Text>
-                <Text>{formatCurrency(wallet.balance)}</Text>
-              </Pressable>
-            ))}
+            {wallets.length === 0 ? (
+              <Text style={{textAlign: 'center', marginTop: 10}}>
+                Không có ví nào.
+              </Text>
+            ) : (
+              wallets.map(wallet => (
+                <Pressable
+                  key={wallet.id}
+                  style={styles.walletItem}
+                  onPress={() => {
+                    setSelectedWallet(wallet);
+                    setWalletModalVisible(false);
+                  }}>
+                  <Text style={styles.walletName}>{wallet.name}</Text>
+                  <Text>{formatCurrency(wallet.balance)}</Text>
+                </Pressable>
+              ))
+            )}
           </View>
         </View>
       </Modal>
@@ -375,5 +420,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 16,
     paddingHorizontal: 10,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    elevation: 2,
+    marginTop: 5,
   },
 });

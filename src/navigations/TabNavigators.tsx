@@ -38,7 +38,7 @@ const TabNavigators = () => {
         }}
       />
       <Tab.Screen
-        name="Thông tin"
+        name="Cài đặt"
         component={ProfileScreen}
         options={{
           tabBarIcon: ({color}) => <User color={color} size={23} variant="Bold" />,

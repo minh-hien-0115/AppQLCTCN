@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -57,6 +57,14 @@ const recurrenceOptions = [
 ];
 
 const AddScreen = () => {
+  // --- Thêm phần chọn ví ---
+  const [wallets, setWallets] = useState<
+    {id: string; name: string; icon?: string}[]
+  >([]);
+  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
+  const [modalWalletVisible, setModalWalletVisible] = useState(false);
+
+  // Các state bạn đã có
   const [type, setType] = useState<'income' | 'expense' | ''>('');
   const [category, setCategory] = useState('');
   const [icon, setIcon] = useState('');
@@ -71,6 +79,36 @@ const AddScreen = () => {
 
   const daysInMonth = Array.from({length: 31}, (_, i) => i + 1);
 
+  // Load danh sách ví của user từ firestore (ví dụ)
+  useEffect(() => {
+    const fetchWallets = async () => {
+      try {
+        const currentUser = auth().currentUser;
+        if (!currentUser) return;
+
+        const walletsSnapshot = await firestore()
+          .collection('users')
+          .doc(currentUser.uid)
+          .collection('wallets')
+          .get();
+
+        const walletsData = walletsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as {id: string; name: string; icon?: string}[];
+
+        setWallets(walletsData);
+
+        // Nếu có ví thì chọn mặc định ví đầu tiên
+        if (walletsData.length > 0) setSelectedWalletId(walletsData[0].id);
+      } catch (error) {
+        console.error('Lỗi lấy ví:', error);
+      }
+    };
+
+    fetchWallets();
+  }, []);
+
   const onSave = async () => {
     if (!category.trim() || !amount.trim()) {
       Alert.alert('Lỗi', 'Vui lòng nhập danh mục và số tiền.');
@@ -82,6 +120,11 @@ const AddScreen = () => {
       return;
     }
 
+    if (!selectedWalletId) {
+      Alert.alert('Lỗi', 'Vui lòng chọn ví để lưu giao dịch.');
+      return;
+    }
+
     const amountNumber = Number(amount.replace(/,/g, ''));
     if (isNaN(amountNumber) || amountNumber <= 0) {
       Alert.alert('Lỗi', 'Số tiền không hợp lệ.');
@@ -89,7 +132,7 @@ const AddScreen = () => {
     }
 
     const tagsArray = tags
-      .split(', ')
+      .split(',')
       .map(tag => tag.trim())
       .filter(tag => tag.length > 0);
 
@@ -104,40 +147,32 @@ const AddScreen = () => {
         Alert.alert('Lỗi', 'Bạn chưa đăng nhập.');
         return;
       }
-      
-      const userDoc = await firestore()
-      .collection('users')
-      .where('email', '==', currentUser.email)
-      .limit(1)
-      .get();
-      
-      if (userDoc.empty) {
-        Alert.alert('Lỗi', 'Tài khoản của bạn không tồn tại trong hệ thống.');
-        return;
-      }
-      
+
+      // userId
       const userId = currentUser.uid;
-      const walletId = currentUser.uid;
+      const walletId = selectedWalletId;
 
       await firestore()
-      .collection('users')
-      .doc(userId)
-      .collection('wallets')
-      .doc(walletId)
-      .collection('transactions').add({
-        type,
-        category,
-        icon,
-        amount: amountNumber,
-        note,
-        tags: tagsArray,
-        recurrence,
-        recurrenceDay,
-        createdAt: firestore.FieldValue.serverTimestamp(),
-      });
+        .collection('users')
+        .doc(userId)
+        .collection('wallets')
+        .doc(walletId)
+        .collection('transactions')
+        .add({
+          type,
+          category,
+          icon,
+          amount: amountNumber,
+          note,
+          tags: tagsArray,
+          recurrence,
+          recurrenceDay,
+          createdAt: firestore.FieldValue.serverTimestamp(),
+        });
 
       Alert.alert('Thành công', 'Giao dịch đã được thêm.');
 
+      // Reset form
       setCategory('');
       setAmount('');
       setNote('');
@@ -159,6 +194,20 @@ const AddScreen = () => {
       <ScrollView keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Thêm giao dịch</Text>
 
+        {/* --- Chọn ví --- */}
+        <TouchableOpacity
+          style={[styles.input, styles.dropdown]}
+          onPress={() => setModalWalletVisible(true)}>
+          <Text>
+            {' '}
+            {selectedWalletId
+              ? wallets.find(w => w.id === selectedWalletId)?.name
+              : 'Chọn ví'}
+          </Text>
+          <ArrowDown2 size={20} color="#555" />
+        </TouchableOpacity>
+
+        {/* --- Chọn danh mục --- */}
         <TouchableOpacity
           style={[styles.input, styles.dropdown]}
           onPress={() => setModalVisible(true)}>
@@ -220,6 +269,41 @@ const AddScreen = () => {
         </TouchableOpacity>
       </ScrollView>
 
+      {/* Modal chọn ví */}
+      <Modal visible={modalWalletVisible} animationType="slide">
+        <View style={styles.container}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setModalWalletVisible(false)}>
+              <CloseCircle size={28} color="red" />
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={wallets}
+            keyExtractor={item => item.id}
+            renderItem={({item}) => (
+              <TouchableOpacity
+                style={styles.categoryItem}
+                onPress={() => {
+                  setSelectedWalletId(item.id);
+                  setModalWalletVisible(false);
+                }}>
+                <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                  {item.icon ? (
+                    <Icon
+                      name={item.icon}
+                      size={20}
+                      color="#555"
+                      style={{marginRight: 10}}
+                    />
+                  ) : null}
+                  <Text style={styles.categoryItemText}>{item.name}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+      </Modal>
+
       {/* Modal chọn danh mục */}
       <Modal visible={modalVisible} animationType="slide">
         <View style={styles.container}>
@@ -260,74 +344,66 @@ const AddScreen = () => {
       </Modal>
 
       {/* Modal chọn tần suất lặp lại */}
-      <Modal visible={modalRecurrenceVisible} transparent animationType="fade">
-        <View style={styles.modalRecurrenceContainer}>
-          <View style={styles.modalRecurrenceContent}>
-            <Text style={styles.modalTitle}>Chọn tần suất lặp lại</Text>
-            {recurrenceOptions.map(option => (
-              <TouchableOpacity
-                key={option.value}
-                style={[
-                  styles.recurrenceOption,
-                  recurrence === option.value &&
-                    styles.recurrenceOptionSelected,
-                ]}
-                onPress={() => {
-                  setRecurrence(option.value);
-                  setModalRecurrenceVisible(false);
-                  if (option.value === 'monthly')
-                    setModalRecurrenceDayVisible(true);
-                }}>
-                <Text>{option.label}</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setModalRecurrenceVisible(false)}>
-              <Text style={{color: 'red'}}>Hủy</Text>
+      <Modal visible={modalRecurrenceVisible} animationType="slide">
+        <View style={styles.container}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setModalRecurrenceVisible(false)}>
+              <CloseCircle size={28} color="red" />
             </TouchableOpacity>
           </View>
+          <FlatList
+            data={recurrenceOptions}
+            keyExtractor={item => item.value}
+            renderItem={({item}) => (
+              <TouchableOpacity
+                style={styles.categoryItem}
+                onPress={() => {
+                  setRecurrence(item.value);
+                  setRecurrenceDay(null);
+                  setModalRecurrenceVisible(false);
+                  if (item.value === 'monthly') {
+                    setModalRecurrenceDayVisible(true);
+                  }
+                }}>
+                <Text style={styles.categoryItemText}>{item.label}</Text>
+              </TouchableOpacity>
+            )}
+          />
         </View>
       </Modal>
 
-      {/* Modal chọn ngày trong tháng */}
-      <Modal
-        visible={modalRecurrenceDayVisible}
-        transparent
-        animationType="fade">
-        <View style={styles.modalRecurrenceContainer}>
-          <View style={[styles.modalRecurrenceContent, {alignItems: 'center'}]}>
-            <Text style={styles.modalTitle}>Chọn ngày trong tháng</Text>
-            <View
-              style={{
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-                justifyContent: 'center',
-              }}>
-              {daysInMonth.map(day => (
-                <TouchableOpacity
-                  key={day}
-                  style={[
-                    styles.dayItem,
-                    recurrenceDay === day && {backgroundColor: '#007AFF'},
-                  ]}
-                  onPress={() => {
-                    setRecurrenceDay(day);
-                    setModalRecurrenceDayVisible(false);
-                  }}>
-                  <Text
-                    style={{color: recurrenceDay === day ? '#fff' : '#000'}}>
-                    {day}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setModalRecurrenceDayVisible(false)}>
-              <Text style={{color: 'red'}}>Hủy</Text>
+      {/* Modal chọn ngày trong tháng nếu lặp lại hàng tháng */}
+      <Modal visible={modalRecurrenceDayVisible} animationType="slide">
+        <View style={styles.container}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setModalRecurrenceDayVisible(false)}>
+              <CloseCircle size={28} color="red" />
             </TouchableOpacity>
           </View>
+          <FlatList
+            data={daysInMonth}
+            keyExtractor={item => item.toString()}
+            numColumns={7}
+            renderItem={({item}) => (
+              <TouchableOpacity
+                style={[
+                  styles.dayItem,
+                  recurrenceDay === item && styles.dayItemSelected,
+                ]}
+                onPress={() => {
+                  setRecurrenceDay(item);
+                  setModalRecurrenceDayVisible(false);
+                }}>
+                <Text
+                  style={[
+                    styles.dayText,
+                    recurrenceDay === item && styles.dayTextSelected,
+                  ]}>
+                  {item}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
         </View>
       </Modal>
     </KeyboardAvoidingView>
@@ -338,23 +414,21 @@ export default AddScreen;
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1, 
+    flex: 1,
+    padding: 16,
     backgroundColor: '#fff',
-    paddingHorizontal: 10
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
+    marginBottom: 16,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#aaa',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    fontSize: 16,
     marginBottom: 12,
   },
   dropdown: {
@@ -363,70 +437,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#1e90ff',
+    paddingVertical: 15,
     borderRadius: 8,
-    paddingVertical: 14,
-    marginTop: 12,
-    marginBottom: 30,
+    marginTop: 20,
+    marginBottom: 40,
   },
   saveButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
     textAlign: 'center',
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    padding: 10,
   },
   categoryItem: {
     padding: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderColor: '#eee',
   },
-  categoryItemText: {fontSize: 16},
-  modalRecurrenceContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalRecurrenceContent: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    width: '90%',
-    padding: 16,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  recurrenceOption: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  recurrenceOptionSelected: {
-    backgroundColor: '#e6f0ff',
-  },
-  modalCloseButton: {
-    marginTop: 12,
-    alignItems: 'center',
+  categoryItemText: {
+    fontSize: 16,
   },
   dayItem: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#007AFF',
     margin: 4,
+    borderRadius: 20,
+    backgroundColor: '#eee',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  dayItemSelected: {
+    backgroundColor: '#1e90ff',
+  },
+  dayText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  dayTextSelected: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
