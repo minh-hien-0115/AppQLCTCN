@@ -5,60 +5,89 @@ import {
   StyleSheet,
   ActivityIndicator,
   FlatList,
+  Modal,
+  TouchableOpacity,
+  Pressable,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { AvatarComponents } from '../../components';
 
 const HomeScreen = () => {
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [wallets, setWallets] = useState<any[]>([]);
+  const [selectedWallet, setSelectedWallet] = useState<any>(null);
+  const [walletModalVisible, setWalletModalVisible] = useState(false);
+
+  const userId = auth().currentUser?.uid;
 
   useEffect(() => {
-  const userId = auth().currentUser?.uid;
-  if (!userId) {
-    setDisplayName('Người dùng');
-    setLoading(false);
-    return;
-  }
-
-  // Lấy tên người dùng từ document users/{userId}
-  firestore()
-    .collection('users')
-    .doc(userId)
-    .get()
-    .then(docSnapshot => {
-      if (docSnapshot.exists()) {
-        const data = docSnapshot.data();
-        setDisplayName(data?.fullname || 'Người dùng');
-      } else {
-        setDisplayName('Người dùng');
-      }
-    })
-    .catch(error => {
-      console.error('Lỗi khi lấy thông tin người dùng:', error);
+    if (!userId) {
       setDisplayName('Người dùng');
-    });
-
-  // Lấy transactions từ users/{userId}/transactions
-  const unsubscribe = firestore()
-    .collection('users')
-    .doc(userId)
-    .collection('transactions')
-    .orderBy('createdAt', 'desc')
-    .onSnapshot(snapshot => {
-      const data = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setTransactions(data as any[]);
       setLoading(false);
-    });
+      return;
+    }
 
-  return () => unsubscribe();
-}, []);
+    firestore()
+      .collection('users')
+      .doc(userId)
+      .get()
+      .then(docSnapshot => {
+        if (docSnapshot.exists()) {
+          const data = docSnapshot.data();
+          setDisplayName(data?.fullname || 'Người dùng');
+        } else {
+          setDisplayName('Người dùng');
+        }
+      })
+      .catch(error => {
+        console.error('Lỗi khi lấy thông tin người dùng:', error);
+        setDisplayName('Người dùng');
+      });
 
+    const unsubscribeWallets = firestore()
+      .collection('users')
+      .doc(userId)
+      .collection('wallets')
+      .onSnapshot(snapshot => {
+        const walletList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setWallets(walletList);
+        if (!selectedWallet && walletList.length > 0) {
+          setSelectedWallet(walletList[0]);
+        }
+      });
+
+    return () => unsubscribeWallets();
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId || !selectedWallet) return;
+
+    setLoading(true);
+    const unsubscribe = firestore()
+      .collection('users')
+      .doc(userId)
+      .collection('wallets')
+      .doc(selectedWallet.id)
+      .collection('transactions')
+      .orderBy('createdAt', 'desc')
+      .onSnapshot(snapshot => {
+        const data = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setTransactions(data);
+        setLoading(false);
+      });
+
+    return () => unsubscribe();
+  }, [userId, selectedWallet]);
 
   const totalIncome = transactions
     .filter(item => item.type === 'income')
@@ -99,11 +128,26 @@ const HomeScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.welcome}>Xin chào, {displayName}!</Text>
+      <View style={styles.welcomeRow}>
+  <Text style={styles.welcome}>Xin chào, {displayName}</Text>
+  <AvatarComponents />
+</View>
+
 
       <View style={styles.summaryBox}>
-        <Text style={styles.label}>Số dư hiện tại</Text>
-        <Text style={styles.balance}>{formatCurrency(balance)}</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.label}>
+            Số dư hiện tại của {selectedWallet?.name ?? 'Ví'}
+          </Text>
+          <TouchableOpacity onPress={() => setWalletModalVisible(true)}>
+            <Icon name="dots-vertical" size={22} color="#555" />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.balance}>
+          {selectedWallet
+            ? formatCurrency(selectedWallet.balance)
+            : formatCurrency(balance)}
+        </Text>
 
         <View style={styles.row}>
           <View style={styles.box}>
@@ -145,6 +189,36 @@ const HomeScreen = () => {
           contentContainerStyle={{paddingBottom: 20}}
         />
       )}
+
+      {/* Modal chọn ví */}
+      <Modal
+        visible={walletModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setWalletModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn ví</Text>
+              <TouchableOpacity onPress={() => setWalletModalVisible(false)}>
+                <Icon name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            {wallets.map(wallet => (
+              <Pressable
+                key={wallet.id}
+                style={styles.walletItem}
+                onPress={() => {
+                  setSelectedWallet(wallet);
+                  setWalletModalVisible(false);
+                }}>
+                <Text style={styles.walletName}>{wallet.name}</Text>
+                <Text>{formatCurrency(wallet.balance)}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -156,7 +230,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 10,
     backgroundColor: '#fafafa',
-    marginTop: 30,
+    
   },
   welcome: {
     fontSize: 18,
@@ -169,6 +243,11 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 20,
     elevation: 2,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   label: {
     fontSize: 16,
@@ -241,4 +320,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  walletItem: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderColor: '#eee',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  walletName: {
+    fontSize: 16,
+  },
+  welcomeRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 10,
+},
 });

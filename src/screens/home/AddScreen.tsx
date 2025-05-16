@@ -104,23 +104,26 @@ const AddScreen = () => {
         Alert.alert('Lỗi', 'Bạn chưa đăng nhập.');
         return;
       }
-
+      
       const userDoc = await firestore()
-        .collection('users')
-        .where('email', '==', currentUser.email)
-        .limit(1)
-        .get();
-
+      .collection('users')
+      .where('email', '==', currentUser.email)
+      .limit(1)
+      .get();
+      
       if (userDoc.empty) {
         Alert.alert('Lỗi', 'Tài khoản của bạn không tồn tại trong hệ thống.');
         return;
       }
-
+      
       const userId = currentUser.uid;
+      const walletId = currentUser.uid;
 
       await firestore()
       .collection('users')
       .doc(userId)
+      .collection('wallets')
+      .doc(walletId)
       .collection('transactions').add({
         type,
         category,

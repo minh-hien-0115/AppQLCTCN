@@ -214,14 +214,14 @@ const StatisticalScreen = () => {
       <Text style={styles.title}>Thống kê tài chính</Text>
 
       <View style={styles.summaryBox}>
+        <Text style={[styles.label, {fontWeight: 'bold'}]}>
+          Số dư: {formatCurrency(balance)}
+        </Text>
         <Text style={styles.label}>
           Tổng thu nhập: {formatCurrency(totalIncome)}
         </Text>
         <Text style={styles.label}>
           Tổng chi tiêu: {formatCurrency(totalExpense)}
-        </Text>
-        <Text style={[styles.label, {fontWeight: 'bold'}]}>
-          Số dư: {formatCurrency(balance)}
         </Text>
       </View>
 
