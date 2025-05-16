@@ -8,11 +8,17 @@ import {
   Modal,
   TouchableOpacity,
   Pressable,
+  Image,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { AvatarComponents } from '../../components';
+
+// Nếu bạn có component AvatarComponents riêng, bạn có thể chỉnh sửa nó nhận prop uri
+// hoặc bạn có thể thay bằng Image như ví dụ bên dưới
+
+const DEFAULT_AVATAR = 'https://i.pravatar.cc/150?img=3';
 
 const HomeScreen = () => {
   const [displayName, setDisplayName] = useState('');
@@ -21,6 +27,7 @@ const HomeScreen = () => {
   const [wallets, setWallets] = useState<any[]>([]);
   const [selectedWallet, setSelectedWallet] = useState<any>(null);
   const [walletModalVisible, setWalletModalVisible] = useState(false);
+  const [avatarUri, setAvatarUri] = useState<string>(DEFAULT_AVATAR);
 
   const userId = auth().currentUser?.uid;
 
@@ -31,6 +38,7 @@ const HomeScreen = () => {
       return;
     }
 
+    // Lấy thông tin user, gồm fullname và avatar
     firestore()
       .collection('users')
       .doc(userId)
@@ -39,13 +47,16 @@ const HomeScreen = () => {
         if (docSnapshot.exists()) {
           const data = docSnapshot.data();
           setDisplayName(data?.fullname || 'Người dùng');
+          setAvatarUri(data?.avatar || DEFAULT_AVATAR);
         } else {
           setDisplayName('Người dùng');
+          setAvatarUri(DEFAULT_AVATAR);
         }
       })
       .catch(error => {
         console.error('Lỗi khi lấy thông tin người dùng:', error);
         setDisplayName('Người dùng');
+        setAvatarUri(DEFAULT_AVATAR);
       });
 
     const unsubscribeWallets = firestore()
@@ -129,10 +140,10 @@ const HomeScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.welcomeRow}>
-  <Text style={styles.welcome}>Xin chào, {displayName}</Text>
-  <AvatarComponents />
-</View>
-
+        <Text style={styles.welcome}>Xin chào, {displayName}</Text>
+        {/* Hiển thị avatar lấy từ Firebase hoặc mặc định */}
+        <AvatarComponents uri={avatarUri} />
+      </View>
 
       <View style={styles.summaryBox}>
         <View style={styles.headerRow}>
@@ -181,6 +192,10 @@ const HomeScreen = () => {
 
       {loading ? (
         <ActivityIndicator size="large" color="#1e90ff" />
+      ) : transactions.length === 0 ? (
+        <View style={{alignItems: 'center', marginTop: 30}}>
+          <Text style={{fontSize: 16, color: '#888'}}>Không có dữ liệu</Text>
+        </View>
       ) : (
         <FlatList
           data={transactions}
@@ -230,7 +245,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 10,
     backgroundColor: '#fafafa',
-    
   },
   welcome: {
     fontSize: 18,
@@ -327,9 +341,11 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: '#fff',
-    padding: 20,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '60%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -342,19 +358,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   walletItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderColor: '#eee',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderColor: '#eee',
   },
   walletName: {
     fontSize: 16,
+    fontWeight: '500',
+    color: '#222',
   },
   welcomeRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: 10,
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingHorizontal: 10,
+  },
 });

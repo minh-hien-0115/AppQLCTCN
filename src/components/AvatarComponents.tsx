@@ -1,11 +1,16 @@
 import { StyleSheet, Text, View, Image } from 'react-native';
 import React from 'react';
 
-const AvatarComponents = () => {
+interface Props {
+  uri?: string;
+}
+
+const AvatarComponents = (props: Props) => {
+  const avatarUri = props.uri || 'https://i.pravatar.cc/150?img=3';
   return (
     <View style={styles.container}>
       <Image
-        source={{ uri: 'https://i.pravatar.cc/150?img=3' }} // Avatar mẫu
+        source={{ uri: avatarUri }}
         style={styles.avatar}
       />
     </View>
