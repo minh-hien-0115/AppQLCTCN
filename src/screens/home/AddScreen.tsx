@@ -59,9 +59,7 @@ const recurrenceOptions = [
 
 const AddScreen = () => {
   // --- Thêm phần chọn ví ---
-  const [wallets, setWallets] = useState<
-    {id: string; name: string; icon?: string}[]
-  >([]);
+  const [wallets, setWallets] = useState<{ id: string; name: string; icon?: string; balance?: number }[]>([]);
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
   const [modalWalletVisible, setModalWalletVisible] = useState(false);
 
@@ -124,82 +122,104 @@ const AddScreen = () => {
   }, [modalWalletVisible, fetchWallets]);
 
   const onSave = async () => {
-    if (!category.trim() || !amount.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập danh mục và số tiền.');
+  if (!category.trim() || !amount.trim()) {
+    Alert.alert('Lỗi', 'Vui lòng nhập danh mục và số tiền.');
+    return;
+  }
+
+  if (!type || !icon) {
+    Alert.alert('Lỗi', 'Danh mục không hợp lệ.');
+    return;
+  }
+
+  if (!selectedWalletId) {
+    Alert.alert('Lỗi', 'Vui lòng chọn ví để lưu giao dịch.');
+    return;
+  }
+
+  const amountNumber = Number(amount.replace(/,/g, ''));
+  if (isNaN(amountNumber) || amountNumber <= 0) {
+    Alert.alert('Lỗi', 'Số tiền không hợp lệ.');
+    return;
+  }
+
+  const tagsArray = tags
+    .split(',')
+    .map(tag => tag.trim())
+    .filter(tag => tag.length > 0);
+
+  if (recurrence === 'monthly' && !recurrenceDay) {
+    Alert.alert('Lỗi', 'Vui lòng chọn ngày trong tháng để lặp lại.');
+    return;
+  }
+
+  try {
+    const currentUser = auth().currentUser;
+    if (!currentUser) {
+      Alert.alert('Lỗi', 'Bạn chưa đăng nhập.');
       return;
     }
 
-    if (!type || !icon) {
-      Alert.alert('Lỗi', 'Danh mục không hợp lệ.');
-      return;
-    }
+    const userId = currentUser.uid;
+    const walletRef = firestore()
+      .collection('users')
+      .doc(userId)
+      .collection('wallets')
+      .doc(selectedWalletId);
 
-    if (!selectedWalletId) {
-      Alert.alert('Lỗi', 'Vui lòng chọn ví để lưu giao dịch.');
-      return;
-    }
-
-    const amountNumber = Number(amount.replace(/,/g, ''));
-    if (isNaN(amountNumber) || amountNumber <= 0) {
-      Alert.alert('Lỗi', 'Số tiền không hợp lệ.');
-      return;
-    }
-
-    const tagsArray = tags
-      .split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
-
-    if (recurrence === 'monthly' && !recurrenceDay) {
-      Alert.alert('Lỗi', 'Vui lòng chọn ngày trong tháng để lặp lại.');
-      return;
-    }
-
-    try {
-      const currentUser = auth().currentUser;
-      if (!currentUser) {
-        Alert.alert('Lỗi', 'Bạn chưa đăng nhập.');
-        return;
+    await firestore().runTransaction(async transaction => {
+      const walletDoc = await transaction.get(walletRef);
+      if (!walletDoc.exists) {
+        throw new Error('Ví không tồn tại');
       }
 
-      // userId
-      const userId = currentUser.uid;
-      const walletId = selectedWalletId;
+      const walletData = walletDoc.data() || {};
+      const currentBalance = walletData.balance;
 
-      await firestore()
-        .collection('users')
-        .doc(userId)
-        .collection('wallets')
-        .doc(walletId)
-        .collection('transactions')
-        .add({
-          type,
-          category,
-          icon,
-          amount: amountNumber,
-          note,
-          tags: tagsArray,
-          recurrence,
-          recurrenceDay,
-          createdAt: firestore.FieldValue.serverTimestamp(),
-        });
+      // Kiểm tra xem balance có phải là số hợp lệ không
+      if (typeof currentBalance !== 'number') {
+        throw new Error('Số dư ví không hợp lệ hoặc chưa được khởi tạo.');
+      }
 
-      Alert.alert('Thành công', 'Giao dịch đã được thêm.');
+      const newBalance =
+        type === 'income'
+          ? currentBalance + amountNumber
+          : currentBalance - amountNumber;
 
-      // Reset form
-      setCategory('');
-      setAmount('');
-      setNote('');
-      setType('');
-      setIcon('');
-      setTags('');
-      setRecurrence('none');
-      setRecurrenceDay(null);
-    } catch (error) {
-      console.error(error);
-      Alert.alert('Lỗi', 'Không thể thêm giao dịch.');
-    }
-  };
+      // Tạo giao dịch mới
+      const newTransactionRef = walletRef.collection('transactions').doc();
+      transaction.set(newTransactionRef, {
+        type,
+        category,
+        icon,
+        amount: amountNumber,
+        note,
+        tags: tagsArray,
+        recurrence,
+        recurrenceDay,
+        createdAt: firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Cập nhật số dư ví
+      transaction.update(walletRef, { balance: newBalance });
+    });
+
+    Alert.alert('Thành công', 'Giao dịch đã được thêm.');
+
+    // Reset form
+    setCategory('');
+    setAmount('');
+    setNote('');
+    setType('');
+    setIcon('');
+    setTags('');
+    setRecurrence('none');
+    setRecurrenceDay(null);
+  } catch (error) {
+    console.error('Lỗi khi lưu:', error);
+    Alert.alert('Lỗi', 'Không thể thêm giao dịch.');
+  }
+};
 
   return (
     <KeyboardAvoidingView
@@ -500,7 +520,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    maxHeight: '60%',
+    maxHeight: '50%',
   },
   modalTitle: {fontSize: 20, fontWeight: 'bold', marginBottom: 10},
   walletItem: {
