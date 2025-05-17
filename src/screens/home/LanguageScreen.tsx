@@ -7,7 +7,6 @@ const languages = [
   { code: 'en', label: 'English' },
   { code: 'zh', label: 'Tiếng Trung' },
   { code: 'jp', label: 'Tiếng Nhật' },
-  // bạn có thể thêm ngôn ngữ khác
 ];
 
 const LanguageScreen = () => {
@@ -15,7 +14,6 @@ const LanguageScreen = () => {
 
   const handleSelectLanguage = (code: string) => {
     setSelectedLanguage(code);
-    // TODO: Lưu lựa chọn này vào AsyncStorage hoặc Context / Redux để áp dụng cho app
   };
 
   const renderItem = ({ item }: { item: typeof languages[0] }) => {

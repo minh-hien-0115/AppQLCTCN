@@ -12,9 +12,11 @@ import Feather from 'react-native-vector-icons/Feather';
 import {useTheme} from '../../constants/ThemeContext';
 import auth from '@react-native-firebase/auth';
 import messaging from '@react-native-firebase/messaging';
+import {appColors} from '../../constants/appColors';
 
 const SettingScreen = ({navigation}: any) => {
-  const [isNotificationEnabled, setIsNotificationEnabled] = React.useState(false);
+  const [isNotificationEnabled, setIsNotificationEnabled] =
+    React.useState(false);
   const {theme, toggleTheme, colors} = useTheme();
 
   const toggleNotification = async () => {
@@ -147,18 +149,32 @@ const SettingScreen = ({navigation}: any) => {
       <View style={styles.settingItem}>
         <View style={styles.settingLeft}>
           <Feather name="bell" size={22} color={colors.tabBarIcon} />
-          <Text style={[styles.settingText, {color: colors.text}]}>Thông báo</Text>
+          <Text style={[styles.settingText, {color: colors.text}]}>
+            Thông báo
+          </Text>
         </View>
-        <Switch value={isNotificationEnabled} onValueChange={toggleNotification} />
+        <Switch
+          value={isNotificationEnabled}
+          onValueChange={toggleNotification}
+          trackColor={{true: appColors.primary}}
+          thumbColor={appColors.white}
+        />
       </View>
 
       {/* Chế độ tối */}
       <View style={styles.settingItem}>
         <View style={styles.settingLeft}>
           <Feather name="moon" size={22} color={colors.tabBarIcon} />
-          <Text style={[styles.settingText, {color: colors.text}]}>Chế độ tối</Text>
+          <Text style={[styles.settingText, {color: colors.text}]}>
+            Chế độ tối
+          </Text>
         </View>
-        <Switch value={theme === 'dark'} onValueChange={toggleTheme} />
+        <Switch
+          value={theme === 'dark'}
+          onValueChange={toggleTheme}
+          trackColor={{true: appColors.primary}}
+          thumbColor={appColors.white}
+        />
       </View>
 
       {/* Quản lý tài khoản ngân hàng / ví điện tử */}
@@ -201,8 +217,12 @@ const SettingScreen = ({navigation}: any) => {
       </TouchableOpacity>
 
       {/* Đăng xuất */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>Đăng xuất</Text>
+      <TouchableOpacity style={styles.settingItem} onPress={handleLogout}>
+        <View style={styles.settingLeft}>
+          <Feather name="log-out" size={22} />
+          <Text style={[styles.settingText]}>Đăng xuất</Text>
+        </View>
+        <Feather name="chevron-right" size={24} color={colors.tabBarIcon} />
       </TouchableOpacity>
     </ScrollView>
   );

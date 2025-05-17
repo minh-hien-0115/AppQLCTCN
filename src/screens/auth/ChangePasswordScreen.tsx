@@ -5,27 +5,42 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  Modal,
 } from 'react-native';
 import React, { useState } from 'react';
 import auth from '@react-native-firebase/auth';
-import firestore from '@react-native-firebase/firestore';
 import Feather from 'react-native-vector-icons/Feather';
 
 const ChangePasswordScreen = ({ navigation }: any) => {
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  const [isCurrentPasswordHidden, setIsCurrentPasswordHidden] = useState(true);
   const [isNewPasswordHidden, setIsNewPasswordHidden] = useState(true);
   const [isConfirmPasswordHidden, setIsConfirmPasswordHidden] = useState(true);
 
-  // Modal hiện khi cần người dùng đăng nhập lại (reauthenticate)
-  const [modalVisible, setModalVisible] = useState(false);
-  const [reauthEmail, setReauthEmail] = useState('');
-  const [reauthPassword, setReauthPassword] = useState('');
-  const [isReauthPasswordHidden, setIsReauthPasswordHidden] = useState(true);
+  const reauthenticate = async (currentPassword: string) => {
+    const user = auth().currentUser;
+    if (!user || !user.email) {
+      Alert.alert('Lỗi', 'Bạn chưa đăng nhập');
+      return false;
+    }
+    const credential = auth.EmailAuthProvider.credential(
+      user.email,
+      currentPassword
+    );
+    try {
+      await user.reauthenticateWithCredential(credential);
+      return true;
+    } catch (error) {
+      console.error('Reauthentication failed:', error);
+      Alert.alert('Lỗi', 'Mật khẩu hiện tại không đúng');
+      return false;
+    }
+  };
 
   const handleChangePassword = async () => {
-    if (!newPassword || !confirmPassword) {
+    if (!currentPassword || !newPassword || !confirmPassword) {
       Alert.alert('Lỗi', 'Vui lòng nhập đầy đủ thông tin');
       return;
     }
@@ -41,56 +56,29 @@ const ChangePasswordScreen = ({ navigation }: any) => {
     }
 
     const user = auth().currentUser;
-
     if (!user) {
       Alert.alert('Lỗi', 'Bạn chưa đăng nhập');
       return;
     }
 
-    try {
-      // Nếu bạn muốn kiểm tra user document Firestore:
-      // const userDoc = await firestore().collection('users').doc(user.uid).get();
-      // if (!userDoc.exists) {
-      //   Alert.alert('Lỗi', 'Tài khoản không tồn tại trong hệ thống');
-      //   return;
-      // }
+    // Kiểm tra lại mk cũ
+    const isReauthenticated = await reauthenticate(currentPassword);
+    if (!isReauthenticated) {
+      return; // Nếu mk cũ sai thì dừng
+    }
 
+    try {
       await user.updatePassword(newPassword);
       Alert.alert('Thành công', 'Mật khẩu đã được thay đổi');
-      navigation.goBack();
 
+      // Đăng xuất ng dùng sau khi đổi mk thành công
+      await auth().signOut();
+
+      // Chuyển về screen đăng nhập
+      navigation.navigate('LoginScreen');
     } catch (error: any) {
       console.error('Change password error:', error);
-
-      if (error.code === 'auth/requires-recent-login') {
-        // Hiện modal yêu cầu nhập lại email và password
-        setModalVisible(true);
-      } else {
-        Alert.alert('Lỗi', error.message || 'Không thể thay đổi mật khẩu');
-      }
-    }
-  };
-
-  // Hàm đăng nhập lại (reauthenticate)
-  const handleReauthenticate = async () => {
-    const user = auth().currentUser;
-    if (!user) {
-      Alert.alert('Lỗi', 'Bạn chưa đăng nhập');
-      setModalVisible(false);
-      return;
-    }
-
-    const credential = auth.EmailAuthProvider.credential(reauthEmail, reauthPassword);
-
-    try {
-      await user.reauthenticateWithCredential(credential);
-      setModalVisible(false);
-      Alert.alert('Đăng nhập lại thành công', 'Bạn có thể đổi mật khẩu ngay bây giờ');
-      // Sau khi reauthenticate thành công, gọi lại đổi mật khẩu
-      handleChangePassword();
-    } catch (error: any) {
-      console.error('Reauthenticate error:', error);
-      Alert.alert('Lỗi', 'Thông tin đăng nhập không đúng');
+      Alert.alert('Lỗi', error.message || 'Không thể thay đổi mật khẩu');
     }
   };
 
@@ -98,16 +86,41 @@ const ChangePasswordScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       <Text style={styles.title}>Đổi Mật Khẩu</Text>
 
+      {/* MK hiện tại */}
       <View style={styles.inputContainer}>
+        <Feather name="lock" size={20} color="#999" style={styles.leftIcon} />
+        <TextInput
+          style={styles.input}
+          placeholder="Mật khẩu hiện tại"
+          secureTextEntry={isCurrentPasswordHidden}
+          value={currentPassword}
+          onChangeText={setCurrentPassword}
+          autoCapitalize="none"
+        />
+        <TouchableOpacity
+          onPress={() => setIsCurrentPasswordHidden(prev => !prev)}
+          activeOpacity={0.7}
+        >
+          <Feather
+            name={isCurrentPasswordHidden ? 'eye-off' : 'eye'}
+            size={20}
+            color="#999"
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* MK mới */}
+      <View style={styles.inputContainer}>
+        <Feather name="lock" size={20} color="#999" style={styles.leftIcon} />
         <TextInput
           style={styles.input}
           placeholder="Mật khẩu mới"
           secureTextEntry={isNewPasswordHidden}
           value={newPassword}
           onChangeText={setNewPassword}
+          autoCapitalize="none"
         />
         <TouchableOpacity
-          style={styles.icon}
           onPress={() => setIsNewPasswordHidden(prev => !prev)}
           activeOpacity={0.7}
         >
@@ -119,16 +132,18 @@ const ChangePasswordScreen = ({ navigation }: any) => {
         </TouchableOpacity>
       </View>
 
+      {/* Nhập lại mk mới */}
       <View style={styles.inputContainer}>
+        <Feather name="repeat" size={20} color="#999" style={styles.leftIcon} />
         <TextInput
           style={styles.input}
           placeholder="Nhập lại mật khẩu"
           secureTextEntry={isConfirmPasswordHidden}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
+          autoCapitalize="none"
         />
         <TouchableOpacity
-          style={styles.icon}
           onPress={() => setIsConfirmPasswordHidden(prev => !prev)}
           activeOpacity={0.7}
         >
@@ -143,61 +158,6 @@ const ChangePasswordScreen = ({ navigation }: any) => {
       <TouchableOpacity style={styles.button} onPress={handleChangePassword}>
         <Text style={styles.buttonText}>Cập Nhật Mật Khẩu</Text>
       </TouchableOpacity>
-
-      {/* Modal đăng nhập lại */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Đăng nhập lại để đổi mật khẩu</Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              value={reauthEmail}
-              onChangeText={setReauthEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Mật khẩu"
-                secureTextEntry={isReauthPasswordHidden}
-                value={reauthPassword}
-                onChangeText={setReauthPassword}
-              />
-              <TouchableOpacity
-                style={styles.icon}
-                onPress={() => setIsReauthPasswordHidden(prev => !prev)}
-                activeOpacity={0.7}
-              >
-                <Feather
-                  name={isReauthPasswordHidden ? 'eye-off' : 'eye'}
-                  size={20}
-                  color="#999"
-                />
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity style={styles.button} onPress={handleReauthenticate}>
-              <Text style={styles.buttonText}>Đăng Nhập Lại</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.button, { backgroundColor: '#dc3545', marginTop: 10 }]}
-              onPress={() => setModalVisible(false)}
-            >
-              <Text style={styles.buttonText}>Hủy</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };
@@ -219,49 +179,32 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   inputContainer: {
-    position: 'relative',
-    marginBottom: 20,
-  },
-  input: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#fff',
-    padding: 15,
-    paddingRight: 45,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#ccc',
-    fontSize: 16,
+    marginBottom: 20,
+    paddingHorizontal: 10,
   },
-  icon: {
-    position: 'absolute',
-    right: 15,
-    top: '50%',
-    transform: [{ translateY: -10 }],
+  leftIcon: {
+    marginRight: 10,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
   },
   button: {
     backgroundColor: '#28a745',
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
+    marginTop: 10,
   },
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
   },
 });

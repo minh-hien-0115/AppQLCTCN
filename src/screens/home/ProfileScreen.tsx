@@ -25,8 +25,6 @@ const ProfileScreen = () => {
   const [photo, setPhoto] = useState('https://i.pravatar.cc/150?img=3');
   const [loading, setLoading] = useState(true);
   const [showFullEmail, setShowFullEmail] = useState(false);
-
-  // Modal state
   const [imageModalVisible, setImageModalVisible] = useState(false);
 
   const user = auth().currentUser;
@@ -62,7 +60,7 @@ const ProfileScreen = () => {
         includeBase64: false,
       },
       async (response) => {
-        setImageModalVisible(false); // đóng modal
+        setImageModalVisible(false);
         if (response.didCancel) return;
         if (response.errorCode) {
           Alert.alert('Lỗi', 'Không thể mở thư viện ảnh');
@@ -81,13 +79,12 @@ const ProfileScreen = () => {
     );
   };
 
-  // Mở Google Photos app (nếu có)
   const openGooglePhotos = async () => {
-    setImageModalVisible(false); // đóng modal
+    setImageModalVisible(false);
 
     const googlePhotosUrlScheme = Platform.select({
       ios: 'photos-redirect://',
-      android: 'com.google.android.apps.photos', // package name (chỉ để tham khảo, không dùng mở URL)
+      android: 'com.google.android.apps.photos',
     });
 
     if (!googlePhotosUrlScheme) {
@@ -111,7 +108,6 @@ const ProfileScreen = () => {
         Alert.alert('Lỗi', 'Không thể mở Google Photos.');
       }
     } else if (Platform.OS === 'android') {
-      // Android không hỗ trợ mở Google Photos qua URL scheme
       Alert.alert(
         'Thông báo',
         'Vui lòng mở Google Photos và chọn ảnh, sau đó tải lên ứng dụng.',
@@ -119,7 +115,7 @@ const ProfileScreen = () => {
     }
   };
 
-  // Lưu thay đổi họ tên khi nhấn icon check
+  // Lưu thay đổi fullname khi nhấn icon check
   const handleFieldUpdate = async () => {
     if (!userId) return;
 
@@ -162,8 +158,6 @@ const ProfileScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Thông tin cá nhân</Text>
-
       <View style={styles.profileBox}>
         <TouchableOpacity onPress={() => setImageModalVisible(true)}>
           <Image source={{ uri: photo }} style={styles.avatar} />

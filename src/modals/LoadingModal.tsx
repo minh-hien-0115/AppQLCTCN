@@ -11,8 +11,7 @@ const LoadingModal = (props: Props) => {
   return (
     <Modal visible={visible} style={{ flex: 1 }} transparent statusBarTranslucent>
         <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent:"center", alignItems:"center"}}>
-            <ActivityIndicator color={appColors.white} size={32} />
-            {/* <TextComponents text='Loading' color={appColors.white} /> */}
+            <ActivityIndicator color={appColors.white} size={32} />=
             <Text>Loading...</Text>
         </View>
     </Modal>

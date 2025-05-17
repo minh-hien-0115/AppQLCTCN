@@ -58,12 +58,9 @@ const recurrenceOptions = [
 ];
 
 const AddScreen = () => {
-  // --- Thêm phần chọn ví ---
   const [wallets, setWallets] = useState<{ id: string; name: string; icon?: string; balance?: number }[]>([]);
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
   const [modalWalletVisible, setModalWalletVisible] = useState(false);
-
-  // Các state bạn đã có
   const [type, setType] = useState<'income' | 'expense' | ''>('');
   const [category, setCategory] = useState('');
   const [icon, setIcon] = useState('');
@@ -78,7 +75,7 @@ const AddScreen = () => {
 
   const daysInMonth = Array.from({length: 31}, (_, i) => i + 1);
 
-  // Load danh sách ví của user từ firestore (ví dụ)
+  // Load danh sách ví của ng dùng
   const fetchWallets = useCallback(async () => {
     try {
       const currentUser = auth().currentUser;
@@ -97,16 +94,14 @@ const AddScreen = () => {
 
       setWallets(walletsData);
 
-      // --- FIX: nếu ví hiện tại đã bị xóa thì bỏ chọn ---
       if (selectedWalletId && !walletsData.find(w => w.id === selectedWalletId)) {
         setSelectedWalletId(null);
       }
 
-      // --- FIX: nếu chỉ có 1 ví thì tự chọn ---
       if (walletsData.length === 1) {
         setSelectedWalletId(walletsData[0].id);
       } else if (!selectedWalletId && walletsData.length > 0) {
-        // Nếu chưa chọn ví, chọn ví đầu tiên làm mặc định
+        // Nếu chưa chọn ví, lấy ví đầu tiên làm mặc định
         setSelectedWalletId(walletsData[0].id);
       }
 
@@ -180,13 +175,13 @@ const AddScreen = () => {
         throw new Error('Số dư ví không hợp lệ hoặc chưa được khởi tạo.');
       }
 
-      const expenseThreshold = walletData.expenseThreshold; // Lấy ngưỡng chi tiêu (nếu có)
+      const expenseThreshold = walletData.expenseThreshold; // Lấy ngưỡng chi tiêu
       const newBalance =
         type === 'income'
           ? currentBalance + amountNumber
           : currentBalance - amountNumber;
 
-      // Nếu là chi tiêu và có ngưỡng chi tiêu, kiểm tra
+      // Kiểm tra nếu là chi tiêu và có ngưỡng chi tiêu
       if (
         type === 'expense' &&
         typeof expenseThreshold === 'number' &&
@@ -196,7 +191,7 @@ const AddScreen = () => {
           'Cảnh báo',
           `Bạn đã chi tiêu vượt ngưỡng ${expenseThreshold.toLocaleString()} VNĐ.`
         );
-        // Vẫn cho phép tiếp tục lưu giao dịch
+        // Vẫn đc phép lưu giao dịch
       }
 
       // Tạo giao dịch mới
@@ -216,8 +211,6 @@ const AddScreen = () => {
       // Cập nhật số dư ví
       transaction.update(walletRef, { balance: newBalance });
     });
-
-    // Alert.alert('Thành công', 'Giao dịch đã được thêm.');
 
     // Reset form
     setCategory('');

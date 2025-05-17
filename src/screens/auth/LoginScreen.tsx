@@ -1,5 +1,7 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import auth from '@react-native-firebase/auth';
-import React, { useState } from 'react';
+import { Lock, Profile2User, User } from 'iconsax-react-nativejs';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   SafeAreaView,
@@ -12,7 +14,6 @@ import {
 } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { appColors } from '../../constants/appColors';
 
 const LoginScreen = ({navigation}: any) => {
   const [email, setEmail] = useState<string>('');
@@ -20,28 +21,47 @@ const LoginScreen = ({navigation}: any) => {
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [isremember, setIsRemember] = useState<boolean>(false);
 
-  const validateEmailAndPassword = () => {
-      const emailRegex = /^([a-zA-Z0-9._%+-]+@(gmail\.com|student\.[a-zA-Z0-9-]+\.edu\.vn))$/;
-      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_]).{6,}$/;
-  
-      if (!emailRegex.test(email)) {
-        Alert.alert(
-          'Email không hợp lệ',
-          'Email phải là @gmail.com hoặc student.<tên_trường>.edu.vn'
-        );
-        return false;
+  // Load email & password đã lưu
+  useEffect(() => {
+    const loadCredentials = async () => {
+      try {
+        const savedEmail = await AsyncStorage.getItem('@saved_email');
+        const savedPassword = await AsyncStorage.getItem('@saved_password');
+        if (savedEmail && savedPassword) {
+          setEmail(savedEmail);
+          setPassword(savedPassword);
+          setIsRemember(true);
+        }
+      } catch (e) {
+        console.log('Failed to load credentials', e);
       }
-  
-      if (!passwordRegex.test(password)) {
-        Alert.alert(
-          'Mật khẩu không hợp lệ',
-          'Mật khẩu phải có ít nhất 6 ký tự, bao gồm chữ hoa, chữ thường và ký tự đặc biệt.'
-        );
-        return false;
-      }
-  
-      return true;
     };
+    loadCredentials();
+  }, []);
+
+  const validateEmailAndPassword = () => {
+    const emailRegex =
+      /^([a-zA-Z0-9._%+-]+@(gmail\.com|student\.[a-zA-Z0-9-]+\.edu\.vn))$/;
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_]).{6,}$/;
+
+    if (!emailRegex.test(email)) {
+      Alert.alert(
+        'Email không hợp lệ',
+        'Email phải là @gmail.com hoặc student.<tên_trường>.edu.vn',
+      );
+      return false;
+    }
+
+    if (!passwordRegex.test(password)) {
+      Alert.alert(
+        'Mật khẩu không hợp lệ',
+        'Mật khẩu phải có ít nhất 6 ký tự, bao gồm chữ hoa, chữ thường và ký tự đặc biệt.',
+      );
+      return false;
+    }
+
+    return true;
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -55,6 +75,17 @@ const LoginScreen = ({navigation}: any) => {
 
     try {
       await auth().signInWithEmailAndPassword(email, password);
+
+      if (isremember) {
+        // Lưu thông tin đăng nhập
+        await AsyncStorage.setItem('@saved_email', email);
+        await AsyncStorage.setItem('@saved_password', password);
+      } else {
+        // Xóa thông tin nếu không bật ghi nhớ mật khẩu
+        await AsyncStorage.removeItem('@saved_email');
+        await AsyncStorage.removeItem('@saved_password');
+      }
+      // navigation.navigate('HomeScreen');
     } catch (error: any) {
       console.log('Login error:', error);
       Alert.alert('Lỗi đăng nhập', error.message || 'Đã xảy ra lỗi');
@@ -64,9 +95,9 @@ const LoginScreen = ({navigation}: any) => {
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Đăng Nhập</Text>
-
-      {/* Email input + x icon */}
+      
       <View style={styles.inputContainer}>
+        <User size={20} color="#888" style={styles.iconLeft} />
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -85,8 +116,8 @@ const LoginScreen = ({navigation}: any) => {
         )}
       </View>
 
-      {/* Password input + eye icon */}
       <View style={styles.inputContainer}>
+        <Lock size={20} color="#888" style={styles.iconLeft} />
         <TextInput
           style={styles.input}
           placeholder="Mật khẩu"
@@ -106,19 +137,19 @@ const LoginScreen = ({navigation}: any) => {
         </TouchableOpacity>
       </View>
 
-      {/* Remember me and forgot password */}
       <View style={styles.optionsContainer}>
         <View style={styles.rememberContainer}>
           <Switch
             value={isremember}
             onValueChange={setIsRemember}
-            trackColor={{true: appColors.primary}}
-            thumbColor={appColors.white}
+            trackColor={{true: '#1e90ff'}}
+            thumbColor="#fff"
           />
           <Text style={styles.optionText}>Ghi nhớ mật khẩu</Text>
         </View>
 
-        <TouchableOpacity onPress={() => navigation.navigate('ForgotPasswordScreen')}>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('ForgotPasswordScreen')}>
           <Text style={styles.optionText}>Quên mật khẩu?</Text>
         </TouchableOpacity>
       </View>
@@ -135,7 +166,6 @@ const LoginScreen = ({navigation}: any) => {
         </Text>
       </TouchableOpacity>
 
-      {/* Social Media Icons */}
       <View style={styles.socialIconsContainer}>
         <TouchableOpacity style={styles.iconButton}>
           <Ionicons name="logo-facebook" size={30} />
@@ -171,16 +201,23 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 15,
     position: 'relative',
-  },
-  input: {
-    width: '100%',
-    height: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#fff',
-    paddingHorizontal: 15,
     borderRadius: 10,
     borderColor: '#ccc',
     borderWidth: 1,
     paddingRight: 40,
+    paddingLeft: 10,
+  },
+  iconLeft: {
+    marginRight: 10,
+  },
+  input: {
+    flex: 1,
+    height: 50,
+    fontSize: 16,
+    color: '#000',
   },
   iconRight: {
     position: 'absolute',
