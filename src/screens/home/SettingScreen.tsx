@@ -83,9 +83,12 @@ const SettingScreen = ({navigation}: any) => {
       <TouchableOpacity
         style={styles.settingItem}
         onPress={() => navigation.navigate('Profile')}>
-        <Text style={[styles.settingText, {color: colors.text}]}>
-          Thông tin cá nhân
-        </Text>
+        <View style={styles.settingLeft}>
+          <Feather name="user" size={22} color={colors.tabBarIcon} />
+          <Text style={[styles.settingText, {color: colors.text}]}>
+            Thông tin cá nhân
+          </Text>
+        </View>
         <Feather name="chevron-right" size={24} color={colors.tabBarIcon} />
       </TouchableOpacity>
 
@@ -93,7 +96,12 @@ const SettingScreen = ({navigation}: any) => {
       <TouchableOpacity
         style={styles.settingItem}
         onPress={() => navigation.navigate('Language')}>
-        <Text style={[styles.settingText, {color: colors.text}]}>Ngôn ngữ</Text>
+        <View style={styles.settingLeft}>
+          <Feather name="globe" size={22} color={colors.tabBarIcon} />
+          <Text style={[styles.settingText, {color: colors.text}]}>
+            Ngôn ngữ
+          </Text>
+        </View>
         <Feather name="chevron-right" size={24} color={colors.tabBarIcon} />
       </TouchableOpacity>
 
@@ -101,9 +109,12 @@ const SettingScreen = ({navigation}: any) => {
       <TouchableOpacity
         style={styles.settingItem}
         onPress={() => navigation.navigate('ChangePassword')}>
-        <Text style={[styles.settingText, {color: colors.text}]}>
-          Đổi mật khẩu
-        </Text>
+        <View style={styles.settingLeft}>
+          <Feather name="lock" size={22} color={colors.tabBarIcon} />
+          <Text style={[styles.settingText, {color: colors.text}]}>
+            Đổi mật khẩu
+          </Text>
+        </View>
         <Feather name="chevron-right" size={24} color={colors.tabBarIcon} />
       </TouchableOpacity>
 
@@ -111,61 +122,69 @@ const SettingScreen = ({navigation}: any) => {
       <TouchableOpacity
         style={styles.settingItem}
         onPress={() => navigation.navigate('ExpenseSaving')}>
-        <Text style={[styles.settingText, {color: colors.text}]}>
-          Tùy chỉnh thói quen chi tiêu / tiết kiệm
-        </Text>
+        <View style={styles.settingLeft}>
+          <Feather name="activity" size={22} color={colors.tabBarIcon} />
+          <Text style={[styles.settingText, {color: colors.text}]}>
+            Tùy chỉnh thói quen chi tiêu / tiết kiệm
+          </Text>
+        </View>
         <Feather name="chevron-right" size={24} color={colors.tabBarIcon} />
       </TouchableOpacity>
 
       {/* Thông báo */}
       <View style={styles.settingItem}>
-        <Text style={[styles.settingText, {color: colors.text}]}>Thông báo</Text>
+        <View style={styles.settingLeft}>
+          <Feather name="bell" size={22} color={colors.tabBarIcon} />
+          <Text style={[styles.settingText, {color: colors.text}]}>Thông báo</Text>
+        </View>
         <Switch value={isNotificationEnabled} onValueChange={toggleNotification} />
       </View>
 
       {/* Chế độ tối */}
       <View style={styles.settingItem}>
-        <Text style={[styles.settingText, {color: colors.text}]}>Chế độ tối</Text>
+        <View style={styles.settingLeft}>
+          <Feather name="moon" size={22} color={colors.tabBarIcon} />
+          <Text style={[styles.settingText, {color: colors.text}]}>Chế độ tối</Text>
+        </View>
         <Switch value={theme === 'dark'} onValueChange={toggleTheme} />
       </View>
 
-      {/* Định dạng ngày tháng */}
+      {/* Quản lý tài khoản ngân hàng / ví điện tử */}
       <TouchableOpacity
         style={styles.settingItem}
-        onPress={handleNotImplemented}>
-        <Text style={[styles.settingText, {color: colors.text}]}>
-          Định dạng ngày tháng
-        </Text>
+        onPress={() => navigation.navigate('BanksAndEwallets')}>
+        <View style={styles.settingLeft}>
+          <Feather name="credit-card" size={22} color={colors.tabBarIcon} />
+          <Text style={[styles.settingText, {color: colors.text}]}>
+            Quản lý tài khoản ngân hàng / ví điện tử
+          </Text>
+        </View>
         <Feather name="chevron-right" size={24} color={colors.tabBarIcon} />
       </TouchableOpacity>
 
-      {/* Quản lý tài khoản ngân hàng */}
+      {/* Điều khoản dịch vụ & Chính sách bảo mật */}
       <TouchableOpacity
         style={styles.settingItem}
-        onPress={handleNotImplemented}>
-        <Text style={[styles.settingText, {color: colors.text}]}>
-          Quản lý tài khoản ngân hàng / ví điện tử
-        </Text>
+        onPress={() => navigation.navigate('TOSAndPrivacy')}>
+        <View style={styles.settingLeft}>
+          <Feather name="file-text" size={22} color={colors.tabBarIcon} />
+          <Text style={[styles.settingText, {color: colors.text}]}>
+            Điều khoản dịch vụ & Chính sách bảo mật
+          </Text>
+        </View>
         <Feather name="chevron-right" size={24} color={colors.tabBarIcon} />
       </TouchableOpacity>
 
       {/* Trợ giúp & Phản hồi */}
       <TouchableOpacity
         style={styles.settingItem}
-        onPress={() => navigation.navigate('Help')}>
-        <Text style={[styles.settingText, {color: colors.text}]}>
-          Trợ giúp & Phản hồi
-        </Text>
-        <Feather name="chevron-right" size={24} color={colors.tabBarIcon} />
-      </TouchableOpacity>
-
-      {/* Điều khoản & Chính sách */}
-      <TouchableOpacity
-        style={styles.settingItem}
-        onPress={handleNotImplemented}>
-        <Text style={[styles.settingText, {color: colors.text}]}>
-          Điều khoản dịch vụ & Chính sách bảo mật
-        </Text>
+        onPress={() => navigation.navigate('HelpAndFeedback')}>
+        <View style={styles.settingLeft}>
+          <Feather name="help-circle" size={22} color={colors.tabBarIcon} />
+          <Text style={[styles.settingText, {color: colors.text}]}>
+            Trợ giúp & Phản hồi
+          </Text>
+        </View>
         <Feather name="chevron-right" size={24} color={colors.tabBarIcon} />
       </TouchableOpacity>
 
@@ -213,5 +232,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
+  },
+  settingLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
 });

@@ -4,7 +4,11 @@ import {LanguageScreen, ProfileScreen, SettingScreen} from '../screens/home';
 import {TouchableOpacity} from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import {ChangePasswordScreen} from '../screens/auth';
-import { ExpenseSavingScreen } from '../screens/spending';
+import {ExpenseSavingScreen} from '../screens/spending';
+import BanksAndEwallets from '../screens/setting/BanksAndEwallets';
+import HelpAndFeedback from '../screens/setting/HelpAndFeedback';
+import TOSAndPrivacy from '../screens/setting/TOSAndPrivacy';
+import HelpAndFbackNavigators from './HelpAndFbackNavigators';
 
 const Stack = createNativeStackNavigator();
 
@@ -68,6 +72,48 @@ const SettingStackNavigators = () => {
         component={ExpenseSavingScreen}
         options={({navigation}) => ({
           title: 'Thói quen chi tiêu và tiết kiệm',
+          headerLeft: () => (
+            <TouchableOpacity
+              style={{marginLeft: 15}}
+              onPress={() => navigation.goBack()}>
+              <Feather name="arrow-left" size={24} color="#333" />
+            </TouchableOpacity>
+          ),
+        })}
+      />
+      <Stack.Screen
+        name="BanksAndEwallets"
+        component={BanksAndEwallets}
+        options={({navigation}) => ({
+          title: 'Ngân hàng & Ví điện tử',
+          headerLeft: () => (
+            <TouchableOpacity
+              style={{marginLeft: 15}}
+              onPress={() => navigation.goBack()}>
+              <Feather name="arrow-left" size={24} color="#333" />
+            </TouchableOpacity>
+          ),
+        })}
+      />
+      <Stack.Screen
+        name="HelpAndFeedback"
+        component={HelpAndFbackNavigators}
+        options={({navigation}) => ({
+          title: 'Trợ giúp & Phản hồi',
+          headerLeft: () => (
+            <TouchableOpacity
+              style={{marginLeft: 15}}
+              onPress={() => navigation.goBack()}>
+              <Feather name="arrow-left" size={24} color="#333" />
+            </TouchableOpacity>
+          ),
+        })}
+      />
+      <Stack.Screen
+        name="TOSAndPrivacy"
+        component={TOSAndPrivacy}
+        options={({navigation}) => ({
+          title: 'Điều khoản & Chính sách',
           headerLeft: () => (
             <TouchableOpacity
               style={{marginLeft: 15}}
