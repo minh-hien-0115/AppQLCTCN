@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,44 +8,108 @@ import {
   ScrollView,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
-import {BarChart, PieChart, LineChart} from 'react-native-chart-kit';
-import {Picker} from '@react-native-picker/picker';
+import { PieChart } from 'react-native-chart-kit';
+import { Picker } from '@react-native-picker/picker';
 import dayjs from 'dayjs';
 import auth from '@react-native-firebase/auth';
-import {appColors} from '../../constants/appColors';
+import { appColors } from '../../constants/appColors';
 
 const screenWidth = Dimensions.get('window').width;
+
+// Hàm random màu HEX
+const getRandomColor = () => {
+  const letters = '0123456789ABCDEF';
+  let color = '#';
+  for (let i = 0; i < 6; i++) {
+    color += letters[Math.floor(Math.random() * 16)];
+  }
+  return color;
+};
 
 const StatisticalScreen = () => {
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<any[]>([]);
+  const [wallets, setWallets] = useState<any[]>([]);
+  const [selectedWallet, setSelectedWallet] = useState('all');
   const [timeFilter, setTimeFilter] = useState('all');
-  const [chartType, setChartType] = useState('bar');
   const [typeFilter, setTypeFilter] = useState('both');
 
   useEffect(() => {
     const userId = auth().currentUser?.uid;
-    const unsubscribe = firestore()
+    if (!userId) return;
+
+    const unsubscribeWallets = firestore()
       .collection('users')
       .doc(userId)
-      .collection('transactions')
+      .collection('wallets')
       .onSnapshot(snapshot => {
-        const data = snapshot.docs.map(doc => ({
+        const walletData = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
-          date: doc.data().date?.toDate?.() || new Date(),
         }));
-        setTransactions(data);
-        setLoading(false);
+        setWallets(walletData);
       });
 
-    return () => unsubscribe();
+    return () => unsubscribeWallets();
   }, []);
+
+  useEffect(() => {
+    const userId = auth().currentUser?.uid;
+    if (!userId) return;
+
+    setLoading(true);
+
+    const unsubscribes: (() => void)[] = [];
+
+    const listenWallets = selectedWallet === 'all' ? wallets : wallets.filter(w => w.id === selectedWallet);
+
+    if (listenWallets.length === 0) {
+      setTransactions([]);
+      setLoading(false);
+      return;
+    }
+
+    let allTransactions: any[] = [];
+
+    listenWallets.forEach(wallet => {
+      const unsubscribe = firestore()
+        .collection('users')
+        .doc(userId)
+        .collection('wallets')
+        .doc(wallet.id)
+        .collection('transactions')
+        .onSnapshot(snapshot => {
+          const data = snapshot.docs.map(doc => ({
+            id: doc.id,
+            walletId: wallet.id,
+            ...doc.data(),
+            date: doc.data().date?.toDate?.() || new Date(),
+          }));
+
+          allTransactions = [
+            ...allTransactions.filter(t => t.walletId !== wallet.id),
+            ...data,
+          ];
+
+          setTransactions([...allTransactions]);
+          setLoading(false);
+        });
+      unsubscribes.push(unsubscribe);
+    });
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
+  }, [wallets, selectedWallet]);
 
   useEffect(() => {
     const now = dayjs();
     let filtered = transactions;
+
+    if (selectedWallet !== 'all') {
+      filtered = filtered.filter(t => t.walletId === selectedWallet);
+    }
 
     if (timeFilter !== 'all') {
       filtered = filtered.filter(t => {
@@ -70,70 +134,44 @@ const StatisticalScreen = () => {
     }
 
     setFilteredTransactions(filtered);
-  }, [transactions, timeFilter, typeFilter]);
+  }, [transactions, selectedWallet, timeFilter, typeFilter]);
 
-  const totalIncome = filteredTransactions
-    .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0);
+  const incomeTransactions = filteredTransactions.filter(t => t.type === 'income');
+  const expenseTransactions = filteredTransactions.filter(t => t.type === 'expense');
 
-  const totalExpense = filteredTransactions
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0);
-
+  const totalIncome = incomeTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalExpense = expenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
   const balance = totalIncome - totalExpense;
 
-  const filteredByCategory = filteredTransactions.filter(t =>
-    typeFilter === 'both' ? true : t.type === typeFilter,
-  );
+  const selectedWalletObj = wallets.find(w => w.id === selectedWallet);
+  const walletBalance =
+    selectedWallet === 'all'
+      ? balance
+      : typeof selectedWalletObj?.balance === 'number'
+      ? selectedWalletObj.balance
+      : 0;
 
-  const amountByCategory = filteredByCategory.reduce(
+  const amountByCategory = filteredTransactions.reduce(
     (acc: Record<string, number>, t) => {
-      acc[t.category] = (acc[t.category] || 0) + t.amount;
+      if (!t.category) return acc;
+      acc[t.category] = (acc[t.category] || 0) + Number(t.amount);
       return acc;
     },
     {},
   );
 
-  const categoryList = Object.entries(amountByCategory).map(
-    ([category, amount]) => ({
-      category,
-      amount,
-    }),
-  );
+  const categoryList = Object.entries(amountByCategory).map(([category, amount]) => ({
+    category,
+    amount,
+  }));
 
   const formatCurrency = (num: number) => num.toLocaleString('vi-VN') + ' đ';
 
-  const formatShortCurrency = (label: string): string => {
-    const num = parseFloat(label);
-    if (num >= 1e7) return (num / 1e6).toFixed(1).replace(/\.0$/, '') + 'tr';
-    if (num >= 1e6) return (num / 1e6).toFixed(1).replace(/\.0$/, '') + 'tr';
-    if (num >= 1e5) return (num / 1e3).toFixed(0) + 'k';
-    if (num >= 1e4) return (num / 1e3).toFixed(1) + 'k';
-    return num.toLocaleString('vi-VN');
-  };
-
-  const barChartData = {
-    labels: categoryList.map(item => item.category),
-    datasets: [
-      {
-        data: categoryList.map(item => item.amount),
-      },
-    ],
-  };
-
-  function getRandomColor() {
-    const letters = '0123456789ABCDEF';
-    let color = '#';
-    for (let i = 0; i < 6; i++) {
-      color += letters[Math.floor(Math.random() * 16)];
-    }
-    return color;
-  }
-
   const totalAmount = categoryList.reduce((sum, item) => sum + item.amount, 0);
 
+  // Mỗi lần render sẽ tạo màu ngẫu nhiên cho mỗi category
   const pieChartData = categoryList.map(item => {
-    const percent = ((item.amount / totalAmount) * 100).toFixed(1);
+    const percent = totalAmount ? ((item.amount / totalAmount) * 100).toFixed(1) : '0.0';
     return {
       name: `${item.category} (${percent}%)`,
       amount: item.amount,
@@ -143,52 +181,34 @@ const StatisticalScreen = () => {
     };
   });
 
-  const colorsForLegend = pieChartData.map(item => item.color);
+  // Tạo map category -> màu từ pieChartData để đồng bộ màu legend
+  const categoryColorsMap = pieChartData.reduce<Record<string, string>>((acc, item) => {
+    // name format: "category (xx.x%)", ta lấy category bằng cách cắt từ đầu đến trước dấu " ("
+    const category = item.name.split(' (')[0];
+    acc[category] = item.color;
+    return acc;
+  }, {});
 
-  const categoryColorsMap = categoryList.reduce<Record<string, string>>(
-    (acc, item, idx) => {
-      acc[item.category] = colorsForLegend[idx];
-      return acc;
-    },
-    {},
+  // Chỉnh Legend thành cột dọc, hiển thị màu + tên category + số tiền
+  const Legend = ({
+    items,
+    colors,
+    amounts,
+  }: {
+    items: string[];
+    colors: string[];
+    amounts: number[];
+  }) => (
+    <View style={styles.legendContainerColumn}>
+      {items.map((item, idx) => (
+        <View key={idx} style={styles.legendItemColumn}>
+          <View style={[styles.legendColor, { backgroundColor: colors[idx] }]} />
+          <Text style={styles.legendLabel}>{item}</Text>
+          <Text style={styles.legendAmount}>{formatCurrency(amounts[idx])}</Text>
+        </View>
+      ))}
+    </View>
   );
-
-  // --- Tạo dữ liệu ngày trong 7 ngày gần nhất ---
-  const last7Days = Array.from({length: 7}).map((_, i) =>
-    dayjs()
-      .subtract(2 - i, 'day')
-      .format('DD/MM'),
-  );
-
-  const dailyData: Record<string, {income: number; expense: number}> = {};
-  last7Days.forEach(date => {
-    dailyData[date] = {income: 0, expense: 0};
-  });
-
-  filteredTransactions.forEach(t => {
-    const date = dayjs(t.date).format('DD/MM');
-    if (dailyData[date]) {
-      if (t.type === 'income') dailyData[date].income += t.amount;
-      if (t.type === 'expense') dailyData[date].expense += t.amount;
-    }
-  });
-
-  const lineChartData = {
-    labels: last7Days,
-    datasets: [
-      {
-        data: last7Days.map(date => dailyData[date].income),
-        color: () => '#4caf50',
-        strokeWidth: 2,
-      },
-      {
-        data: last7Days.map(date => dailyData[date].expense),
-        color: () => '#f44336',
-        strokeWidth: 2,
-      },
-    ],
-    legend: ['Thu nhập', 'Chi tiêu'],
-  };
 
   if (loading) {
     return (
@@ -198,31 +218,32 @@ const StatisticalScreen = () => {
     );
   }
 
-  const Legend = ({items, colors}: {items: string[]; colors: string[]}) => (
-    <View style={styles.legendContainer}>
-      {items.map((item, idx) => (
-        <View key={idx} style={styles.legendItem}>
-          <View style={[styles.legendColor, {backgroundColor: colors[idx]}]} />
-          <Text style={styles.legendLabel}>{item}</Text>
-        </View>
-      ))}
-    </View>
-  );
-
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Thống kê tài chính</Text>
 
       <View style={styles.summaryBox}>
-        <Text style={[styles.label, {fontWeight: 'bold'}]}>
-          Số dư: {formatCurrency(balance)}
+        <Text style={[styles.label, { fontWeight: 'bold' }]}>
+          Số dư: {wallets.length === 0 ? 'Đang tải...' : formatCurrency(walletBalance)}
         </Text>
-        <Text style={styles.label}>
-          Tổng thu nhập: {formatCurrency(totalIncome)}
-        </Text>
-        <Text style={styles.label}>
-          Tổng chi tiêu: {formatCurrency(totalExpense)}
-        </Text>
+        <Text style={styles.label}>Tổng thu nhập: {formatCurrency(totalIncome)}</Text>
+        <Text style={styles.label}>Tổng chi tiêu: {formatCurrency(totalExpense)}</Text>
+      </View>
+
+      <View style={{ marginBottom: 15 }}>
+        <View style={styles.pickerColumn}>
+          <Text style={styles.pickerLabel}>Chọn ví:</Text>
+          <Picker
+            selectedValue={selectedWallet}
+            style={styles.picker}
+            onValueChange={value => setSelectedWallet(value)}
+          >
+            <Picker.Item label="Tất cả ví" value="all" />
+            {wallets.map(wallet => (
+              <Picker.Item key={wallet.id} label={wallet.name} value={wallet.id} />
+            ))}
+          </Picker>
+        </View>
       </View>
 
       <View style={styles.pickerRow}>
@@ -231,7 +252,8 @@ const StatisticalScreen = () => {
           <Picker
             selectedValue={timeFilter}
             style={styles.picker}
-            onValueChange={value => setTimeFilter(value)}>
+            onValueChange={value => setTimeFilter(value)}
+          >
             <Picker.Item label="Tất cả" value="all" />
             <Picker.Item label="Hôm nay" value="day" />
             <Picker.Item label="Tuần này" value="week" />
@@ -245,7 +267,8 @@ const StatisticalScreen = () => {
           <Picker
             selectedValue={typeFilter}
             style={styles.picker}
-            onValueChange={value => setTypeFilter(value)}>
+            onValueChange={value => setTypeFilter(value)}
+          >
             <Picker.Item label="Thu nhập và chi tiêu" value="both" />
             <Picker.Item label="Thu nhập" value="income" />
             <Picker.Item label="Chi tiêu" value="expense" />
@@ -253,77 +276,7 @@ const StatisticalScreen = () => {
         </View>
       </View>
 
-      <View style={styles.pickerColumn}>
-        <Text style={styles.pickerLabel}>Loại biểu đồ:</Text>
-        <Picker
-          selectedValue={chartType}
-          style={styles.picker}
-          onValueChange={value => setChartType(value)}>
-          <Picker.Item label="Biểu đồ cột" value="bar" />
-          <Picker.Item label="Biểu đồ tròn" value="pie" />
-          <Picker.Item label="Biểu đồ đường" value="line" />
-        </Picker>
-      </View>
-
-      {chartType === 'bar' && (
-        <>
-          <ScrollView horizontal style={{marginTop: 15}}>
-            <BarChart
-              data={barChartData}
-              width={Math.max(last7Days.length * 60, screenWidth - 20)}
-              height={220}
-              yAxisLabel=""
-              yAxisSuffix=" đ"
-              chartConfig={{
-                backgroundColor: '#fff',
-                backgroundGradientFrom: '#fff',
-                backgroundGradientTo: '#fff',
-                decimalPlaces: 0,
-                
-                color: (opacity = 1) => `rgba(34, 128, 176, ${opacity})`,
-                labelColor: () => '#333',
-                formatYLabel: formatShortCurrency,
-                style: {borderRadius: 16},
-                propsForDots: {
-                  r: '4',
-                  strokeWidth: '2',
-                  stroke: '#4caf50',
-                },
-                propsForBackgroundLines: {strokeWidth: 0.5, stroke: '#ccc'},
-              }}
-              fromZero
-              showValuesOnTopOfBars
-              withInnerLines={true}
-              withHorizontalLabels={true}
-              withVerticalLabels={true}
-              flatColor={true}
-              
-            />
-          </ScrollView>
-
-          <Legend
-            items={['Thu nhập', 'Chi tiêu']}
-            colors={['#4caf50', '#f44336']}
-          />
-
-          {/* --- Hiển thị chú thích chi tiết thu chi từng ngày --- */}
-          <View style={styles.dailyDetailContainer}>
-            {last7Days.map(date => (
-              <View key={date} style={styles.dailyDetailItem}>
-                <Text style={styles.dailyDate}>{date}</Text>
-                <Text style={[styles.dailyIncome, {color: '#4caf50'}]}>
-                  Thu: {formatCurrency(dailyData[date].income)}
-                </Text>
-                <Text style={[styles.dailyExpense, {color: '#f44336'}]}>
-                  Chi: {formatCurrency(dailyData[date].expense)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </>
-      )}
-
-      {chartType === 'pie' && (
+      {categoryList.length > 0 ? (
         <>
           <PieChart
             data={pieChartData}
@@ -331,72 +284,26 @@ const StatisticalScreen = () => {
             height={220}
             hasLegend={false}
             chartConfig={{
-              color: () => `rgba(0,0,0,0.7)`,
+              backgroundGradientFrom: '#fff',
+              backgroundGradientTo: '#fff',
+              color: (opacity = 1) => `rgba(0,0,0,${opacity})`,
+              labelColor: (opacity = 1) => `rgba(0,0,0,${opacity})`,
             }}
             accessor="amount"
             backgroundColor="transparent"
             paddingLeft="15"
             absolute
           />
-
           <Legend
             items={categoryList.map(c => c.category)}
             colors={categoryList.map(c => categoryColorsMap[c.category])}
+            amounts={categoryList.map(c => c.amount)}
           />
         </>
-      )}
-
-      {chartType === 'line' && (
-        <>
-          <ScrollView horizontal style={{marginTop: 15}}>
-            <LineChart
-              data={lineChartData}
-              width={Math.max(last7Days.length * 60, screenWidth - 20)}
-              height={220}
-              yAxisLabel=""
-              yAxisSuffix=" đ"
-              chartConfig={{
-                backgroundColor: '#fff',
-                backgroundGradientFrom: '#fff',
-                backgroundGradientTo: '#fff',
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(0, 150, 136, ${opacity})`,
-                labelColor: () => '#333',
-                style: {borderRadius: 16},
-                propsForDots: {
-                  r: '4',
-                  strokeWidth: '2',
-                  stroke: '#4caf50',
-                },
-                propsForBackgroundLines: {strokeWidth: 0.5, stroke: '#ccc'},
-              }}
-              bezier
-              fromZero
-              segments={6}
-              formatYLabel={formatShortCurrency}
-            />
-          </ScrollView>
-
-          <Legend
-            items={lineChartData.legend}
-            colors={['#4caf50', '#f44336']}
-          />
-
-          {/* --- Hiển thị chú thích chi tiết thu chi từng ngày --- */}
-          <View style={styles.dailyDetailContainer}>
-            {last7Days.map(date => (
-              <View key={date} style={styles.dailyDetailItem}>
-                <Text style={styles.dailyDate}>{date}</Text>
-                <Text style={[styles.dailyIncome, {color: '#4caf50'}]}>
-                  Thu: {formatCurrency(dailyData[date].income)}
-                </Text>
-                <Text style={[styles.dailyExpense, {color: '#f44336'}]}>
-                  Chi: {formatCurrency(dailyData[date].expense)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </>
+      ) : (
+        <Text style={{ textAlign: 'center', marginTop: 20, color: '#666' }}>
+          Không có dữ liệu để hiển thị biểu đồ
+        </Text>
       )}
     </ScrollView>
   );
@@ -406,14 +313,14 @@ export default StatisticalScreen;
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1, 
-    paddingHorizontal: 10, 
-    backgroundColor: '#f5f5f5'
+    flex: 1,
+    paddingHorizontal: 10,
+    backgroundColor: '#f5f5f5',
   },
   loadingContainer: {
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center'
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     fontSize: 24,
@@ -430,72 +337,52 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   label: {
-    fontSize: 16, 
-    marginBottom: 5, 
-    color: appColors.text
+    fontSize: 16,
+    marginBottom: 5,
+    color: appColors.text,
   },
   pickerRow: {
-    flexDirection: 'column',
+    flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 15,
   },
   pickerColumn: {
-    flex: 1, 
-    marginRight: 10
+    flex: 1,
+    marginRight: 10,
   },
   pickerLabel: {
-    fontSize: 16, 
-    marginBottom: 5, 
-    color: '#555'
+    fontSize: 16,
+    marginBottom: 5,
+    color: '#555',
   },
   picker: {
     backgroundColor: '#fff',
     borderRadius: 6,
   },
-  legendContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  legendContainerColumn: {
     marginTop: 10,
+    flexDirection: 'column',
+    // optional: add border or padding to separate from chart
   },
-  legendItem: {
+  legendItemColumn: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 15,
-    marginBottom: 5,
+    marginBottom: 8,
   },
   legendColor: {
     width: 16,
     height: 16,
     borderRadius: 4,
-    marginRight: 6,
+    marginRight: 8,
   },
   legendLabel: {
     fontSize: 14,
     color: '#333',
+    flex: 1,
   },
-  dailyDetailContainer: {
-    marginTop: 10,
-    marginBottom: 10,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 10,
-  },
-  dailyDetailItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  dailyDate: {
-    fontWeight: 'bold',
-    color: '#222',
-  },
-  dailyIncome: {
-    flex: 1, 
-    textAlign: 'left', 
-    marginLeft: 20
-  },
-  dailyExpense: {
-    flex: 1, 
-    textAlign: 'left', 
-    marginLeft: 20
+  legendAmount: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
   },
 });
