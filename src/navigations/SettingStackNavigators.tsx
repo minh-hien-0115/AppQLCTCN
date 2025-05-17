@@ -98,16 +98,17 @@ const SettingStackNavigators = () => {
       <Stack.Screen
         name="HelpAndFeedback"
         component={HelpAndFbackNavigators}
-        options={({navigation}) => ({
-          title: 'Trợ giúp & Phản hồi',
-          headerLeft: () => (
-            <TouchableOpacity
-              style={{marginLeft: 15}}
-              onPress={() => navigation.goBack()}>
-              <Feather name="arrow-left" size={24} color="#333" />
-            </TouchableOpacity>
-          ),
-        })}
+        options={{headerShown: false}}
+        // options={({navigation}) => ({
+        //   title: 'Trợ giúp & Phản hồi',
+        //   headerLeft: () => (
+        //     <TouchableOpacity
+        //       style={{marginLeft: 15}}
+        //       onPress={() => navigation.goBack()}>
+        //       <Feather name="arrow-left" size={24} color="#333" />
+        //     </TouchableOpacity>
+        //   ),
+        // })}
       />
       <Stack.Screen
         name="TOSAndPrivacy"
