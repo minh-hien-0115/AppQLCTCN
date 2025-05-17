@@ -2,10 +2,19 @@ import React, { useEffect, useState } from 'react';
 import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { NavigationContainer } from '@react-navigation/native';
 import { LoginNavigators, MainNavigators } from './src/navigations';
-import { ThemeProvider } from './src/constants/ThemeContext';
+import { ThemeProvider, useTheme } from './src/constants/ThemeContext';
 
-export default function App() {
+const AppWrapper = () => {
+  return (
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
+  );
+};
+
+function App() {
   const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
+  const { navigationTheme } = useTheme();
 
   useEffect(() => {
     const unsubscribe = auth().onAuthStateChanged(userAuth => {
@@ -16,13 +25,10 @@ export default function App() {
   }, []);
 
   return (
-    // <NavigationContainer>
-    //   {user ? <MainNavigators /> : <LoginNavigators />}
-    // </NavigationContainer>
-    <ThemeProvider>
-      <NavigationContainer>
-        {user ? <MainNavigators /> : <LoginNavigators />}
-      </NavigationContainer>
-    </ThemeProvider>
+    <NavigationContainer theme={navigationTheme}>
+      {user ? <MainNavigators /> : <LoginNavigators />}
+    </NavigationContainer>
   );
 }
+
+export default AppWrapper;

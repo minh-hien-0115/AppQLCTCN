@@ -13,10 +13,12 @@ import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { AvatarComponents } from '../../components';
+import { useTheme } from '../../constants/ThemeContext';
 
 const DEFAULT_AVATAR = 'https://i.pravatar.cc/150?img=3';
 
 const HomeScreen = () => {
+  const { colors } = useTheme();
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<any[]>([]);

@@ -144,13 +144,13 @@ const ProfileScreen = () => {
     return `${name[0]}******${name[name.length - 1]}@${domain}`;
   };
 
-  const handleLogout = async () => {
-    try {
-      await auth().signOut();
-    } catch (error) {
-      Alert.alert('Lỗi', 'Không thể đăng xuất');
-    }
-  };
+  // const handleLogout = async () => {
+  //   try {
+  //     await auth().signOut();
+  //   } catch (error) {
+  //     Alert.alert('Lỗi', 'Không thể đăng xuất');
+  //   }
+  // };
 
   if (loading) {
     return (
@@ -220,9 +220,9 @@ const ProfileScreen = () => {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+      {/* <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.buttonText}>Đăng xuất</Text>
-      </TouchableOpacity>
+      </TouchableOpacity> */}
 
       {/* Modal chọn nguồn ảnh */}
       <Modal
