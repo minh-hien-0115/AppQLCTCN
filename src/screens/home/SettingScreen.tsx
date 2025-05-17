@@ -118,6 +118,18 @@ const SettingScreen = ({navigation}: any) => {
         <Feather name="chevron-right" size={24} color={colors.tabBarIcon} />
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={styles.settingItem}
+        onPress={() => navigation.navigate('TrashScreen')}>
+        <View style={styles.settingLeft}>
+          <Feather name="trash-2" size={22} color={colors.tabBarIcon} />
+          <Text style={[styles.settingText, {color: colors.text}]}>
+            Thùng rác
+          </Text>
+        </View>
+        <Feather name="chevron-right" size={24} color={colors.tabBarIcon} />
+      </TouchableOpacity>
+
       {/* Thói quen chi tiêu */}
       <TouchableOpacity
         style={styles.settingItem}

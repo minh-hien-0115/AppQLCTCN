@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
-import { PieChart } from 'react-native-chart-kit';
+import { PieChart, LineChart } from 'react-native-chart-kit';
 import { Picker } from '@react-native-picker/picker';
 import dayjs from 'dayjs';
 import auth from '@react-native-firebase/auth';
@@ -16,7 +16,6 @@ import { appColors } from '../../constants/appColors';
 
 const screenWidth = Dimensions.get('window').width;
 
-// Hàm random màu HEX
 const getRandomColor = () => {
   const letters = '0123456789ABCDEF';
   let color = '#';
@@ -34,6 +33,7 @@ const StatisticalScreen = () => {
   const [selectedWallet, setSelectedWallet] = useState('all');
   const [timeFilter, setTimeFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('both');
+  const [chartType, setChartType] = useState<'pie' | 'line' | 'both'>('both');
 
   useEffect(() => {
     const userId = auth().currentUser?.uid;
@@ -62,7 +62,8 @@ const StatisticalScreen = () => {
 
     const unsubscribes: (() => void)[] = [];
 
-    const listenWallets = selectedWallet === 'all' ? wallets : wallets.filter(w => w.id === selectedWallet);
+    const listenWallets =
+      selectedWallet === 'all' ? wallets : wallets.filter(w => w.id === selectedWallet);
 
     if (listenWallets.length === 0) {
       setTransactions([]);
@@ -141,7 +142,7 @@ const StatisticalScreen = () => {
 
   const totalIncome = incomeTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
   const totalExpense = expenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-  const balance = totalIncome - totalExpense;
+  const balance = totalIncome + totalExpense;
 
   const selectedWalletObj = wallets.find(w => w.id === selectedWallet);
   const walletBalance =
@@ -167,9 +168,18 @@ const StatisticalScreen = () => {
 
   const formatCurrency = (num: number) => num.toLocaleString('vi-VN') + ' đ';
 
+  const formatShortCurrency = (label: string): string => {
+    const num = parseFloat(label);
+    if (num >= 1e7) return (num / 1e6).toFixed(1).replace(/\.0$/, '') + 'tr';
+    if (num >= 1e6) return (num / 1e6).toFixed(1).replace(/\.0$/, '') + 'tr';
+    if (num >= 1e5) return (num / 1e3).toFixed(0) + 'k';
+    if (num >= 1e4) return (num / 1e3).toFixed(1) + 'k';
+    return num.toLocaleString('vi-VN');
+  };
+
+
   const totalAmount = categoryList.reduce((sum, item) => sum + item.amount, 0);
 
-  // Mỗi lần render sẽ tạo màu ngẫu nhiên cho mỗi category
   const pieChartData = categoryList.map(item => {
     const percent = totalAmount ? ((item.amount / totalAmount) * 100).toFixed(1) : '0.0';
     return {
@@ -181,15 +191,12 @@ const StatisticalScreen = () => {
     };
   });
 
-  // Tạo map category -> màu từ pieChartData để đồng bộ màu legend
   const categoryColorsMap = pieChartData.reduce<Record<string, string>>((acc, item) => {
-    // name format: "category (xx.x%)", ta lấy category bằng cách cắt từ đầu đến trước dấu " ("
     const category = item.name.split(' (')[0];
     acc[category] = item.color;
     return acc;
   }, {});
 
-  // Chỉnh Legend thành cột dọc, hiển thị màu + tên category + số tiền
   const Legend = ({
     items,
     colors,
@@ -205,10 +212,51 @@ const StatisticalScreen = () => {
           <View style={[styles.legendColor, { backgroundColor: colors[idx] }]} />
           <Text style={styles.legendLabel}>{item}</Text>
           <Text style={styles.legendAmount}>{formatCurrency(amounts[idx])}</Text>
+          <View style={styles.legendDivider} />
         </View>
       ))}
     </View>
   );
+
+  const last7Days = Array.from({ length: 7 }, (_, i) =>
+    dayjs().subtract(3 - i, 'day').format('DD/MM'),
+  );
+
+  const incomeData = last7Days.map(day =>
+    filteredTransactions
+      .filter(t => dayjs(t.date).format('DD/MM') === day && t.type === 'income')
+      .reduce((sum, t) => sum + Number(t.amount), 0),
+  );
+
+  const expenseData = last7Days.map(day =>
+    filteredTransactions
+      .filter(t => dayjs(t.date).format('DD/MM') === day && t.type === 'expense')
+      .reduce((sum, t) => sum + Number(t.amount), 0),
+  );
+
+  const totalData = incomeData.map((income, idx) => income + expenseData[idx]);
+
+  const lineChartData = {
+    labels: last7Days,
+    datasets: [
+      {
+        data: incomeData,
+        color: () => '#4CAF50',
+        strokeWidth: 2,
+      },
+      {
+        data: expenseData,
+        color: () => '#F44336',
+        strokeWidth: 2,
+      },
+      {
+        data: totalData,
+        color: () => '#2196F3',
+        strokeWidth: 2,
+      },
+    ],
+    legend: ['Thu nhập', 'Chi tiêu', 'Tổng'],
+  };
 
   if (loading) {
     return (
@@ -276,34 +324,76 @@ const StatisticalScreen = () => {
         </View>
       </View>
 
-      {categoryList.length > 0 ? (
+      <View style={styles.pickerColumn}>
+        <Text style={styles.pickerLabel}>Loại biểu đồ:</Text>
+        <Picker
+          selectedValue={chartType}
+          style={styles.picker}
+          onValueChange={(value: 'pie' | 'line' | 'both') => setChartType(value)}
+        >
+          <Picker.Item label="Biểu đồ tròn" value="pie" />
+          <Picker.Item label="Biểu đồ đường" value="line" />
+          <Picker.Item label="Cả hai" value="both" />
+        </Picker>
+      </View>
+
+      {(chartType === 'pie' || chartType === 'both') &&
+        (categoryList.length > 0 ? (
+          <>
+            <PieChart
+              data={pieChartData}
+              width={screenWidth - 20}
+              height={220}
+              hasLegend={false}
+              chartConfig={{
+                backgroundGradientFrom: '#fff',
+                backgroundGradientTo: '#fff',
+                color: (opacity = 1) => `rgba(0,0,0,${opacity})`,
+                labelColor: (opacity = 1) => `rgba(0,0,0,${opacity})`,
+              }}
+              accessor="amount"
+              backgroundColor="transparent"
+              paddingLeft="15"
+              absolute
+            />
+            <Legend
+              items={categoryList.map(c => c.category)}
+              colors={categoryList.map(c => categoryColorsMap[c.category])}
+              amounts={categoryList.map(c => c.amount)}
+            />
+          </>
+        ) : (
+          <Text style={{ textAlign: 'center', marginTop: 20, color: '#666' }}>
+            Không có dữ liệu để hiển thị biểu đồ
+          </Text>
+        ))}
+
+      {(chartType === 'line' || chartType === 'both') && (
         <>
-          <PieChart
-            data={pieChartData}
-            width={screenWidth - 20}
-            height={220}
-            hasLegend={false}
+          {/* <Text style={[styles.title, { fontSize: 20, marginTop: 30 }]}>
+            Biểu đồ thu chi 7 ngày qua
+          </Text> */}
+        <ScrollView horizontal style={{marginTop: 15}} showsHorizontalScrollIndicator={false} >
+          <LineChart
+            data={lineChartData}
+            width={Math.max(last7Days.length * 60, screenWidth - 20)}
+            height={256}
             chartConfig={{
               backgroundGradientFrom: '#fff',
               backgroundGradientTo: '#fff',
-              color: (opacity = 1) => `rgba(0,0,0,${opacity})`,
-              labelColor: (opacity = 1) => `rgba(0,0,0,${opacity})`,
+              decimalPlaces: 0,
+              color: (opacity = 1) => `rgba(33, 150, 243, ${opacity})`,
+              labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
             }}
-            accessor="amount"
-            backgroundColor="transparent"
-            paddingLeft="15"
-            absolute
+            bezier
+            style={{
+              marginVertical: 8,
+              borderRadius: 8,
+            }}
+            formatYLabel={formatShortCurrency}
           />
-          <Legend
-            items={categoryList.map(c => c.category)}
-            colors={categoryList.map(c => categoryColorsMap[c.category])}
-            amounts={categoryList.map(c => c.amount)}
-          />
+          </ScrollView>
         </>
-      ) : (
-        <Text style={{ textAlign: 'center', marginTop: 20, color: '#666' }}>
-          Không có dữ liệu để hiển thị biểu đồ
-        </Text>
       )}
     </ScrollView>
   );
@@ -362,12 +452,14 @@ const styles = StyleSheet.create({
   legendContainerColumn: {
     marginTop: 10,
     flexDirection: 'column',
-    // optional: add border or padding to separate from chart
   },
   legendItemColumn: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: appColors.border,
+    paddingBottom: 3,
   },
   legendColor: {
     width: 16,
@@ -384,5 +476,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     fontWeight: '600',
+  },
+  legendDivider: {
+    marginTop: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
 });

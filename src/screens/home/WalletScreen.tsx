@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
+import {useFocusEffect} from '@react-navigation/native';
 import LoadingModal from '../../modals/LoadingModal';
 
 const WalletScreen = () => {
@@ -21,7 +22,7 @@ const WalletScreen = () => {
   const [initialBalance, setInitialBalance] = useState('');
   const [loading, setLoading] = useState(false);
   const [wallets, setWallets] = useState<
-    { id: string; name: string; balance: number; currency: string }[]
+    {id: string; name: string; balance: number; currency: string}[]
   >([]);
   const [loadingWallets, setLoadingWallets] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -67,9 +68,12 @@ const WalletScreen = () => {
     }
   };
 
-  useEffect(() => {
-    fetchWallets();
-  }, []);
+  // Thay vì chỉ dùng useEffect, dùng useFocusEffect để load lại ví mỗi khi màn hình focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchWallets();
+    }, []),
+  );
 
   const onCreateWallet = async () => {
     if (!walletName.trim()) {
@@ -135,7 +139,7 @@ const WalletScreen = () => {
 
   const onDeleteWallet = (walletId: string) => {
     Alert.alert('Xoá ví', 'Bạn có chắc muốn xoá ví này?', [
-      { text: 'Huỷ' },
+      {text: 'Huỷ'},
       {
         text: 'Xoá',
         onPress: async () => {
@@ -167,12 +171,6 @@ const WalletScreen = () => {
             // Xóa ví khỏi danh sách chính
             await walletRef.delete();
 
-            // Kiểm tra xem ví có thực sự bị xoá
-            const checkDeleted = await walletRef.get();
-            if (checkDeleted.exists()) {
-              console.warn('Ví chưa được xoá hoàn toàn.');
-            }
-
             await fetchWallets();
           } catch (error) {
             console.error(error);
@@ -181,6 +179,42 @@ const WalletScreen = () => {
         },
       },
     ]);
+  };
+
+  // Ví dụ hàm khôi phục ví từ thùng rác
+  const onRestoreWallet = async (walletId: string) => {
+    try {
+      const currentUser = auth().currentUser;
+      if (!currentUser) return;
+
+      const trashRef = firestore()
+        .collection('users')
+        .doc(currentUser.uid)
+        .collection('trashWallets')
+        .doc(walletId);
+
+      const walletData = (await trashRef.get()).data();
+      if (!walletData) return;
+
+      const walletRef = firestore()
+        .collection('users')
+        .doc(currentUser.uid)
+        .collection('wallets')
+        .doc(walletId);
+
+      await walletRef.set({
+        ...walletData,
+        deletedAt: firestore.FieldValue.delete(), // nếu cần loại bỏ trường này
+      });
+
+      await trashRef.delete();
+
+      Alert.alert('Thành công', 'Ví đã được khôi phục.');
+      await fetchWallets();
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Lỗi', 'Không thể khôi phục ví.');
+    }
   };
 
   const openEditModal = (wallet: any) => {
@@ -252,8 +286,7 @@ const WalletScreen = () => {
         style={[styles.button, loading && styles.buttonDisabled]}
         onPress={onCreateWallet}
         disabled={loading}
-        activeOpacity={0.8}
-      >
+        activeOpacity={0.8}>
         {loading ? (
           <ActivityIndicator color="#fff" />
         ) : (
@@ -261,17 +294,17 @@ const WalletScreen = () => {
         )}
       </TouchableOpacity>
 
-      <Text style={[styles.label, { marginTop: 30 }]}>Tổng số dư của các ví</Text>
+      <Text style={[styles.label, {marginTop: 30}]}>Tổng số dư của các ví</Text>
       <Text style={styles.totalBalance}>
         {totalBalance.toLocaleString('en-US')} {currency}
       </Text>
 
-      <Text style={[styles.label, { marginTop: 20 }]}>Danh sách ví</Text>
+      <Text style={[styles.label, {marginTop: 20}]}>Danh sách ví</Text>
 
       {loadingWallets ? (
         <ActivityIndicator size="large" color="#007AFF" />
       ) : (
-        <ScrollView style={{ maxHeight: 250 }}>
+        <ScrollView style={{maxHeight: 250}}>
           {wallets.length === 0 ? (
             <Text>Chưa có ví nào.</Text>
           ) : (
@@ -280,8 +313,7 @@ const WalletScreen = () => {
                 key={wallet.id}
                 onLongPress={() => onDeleteWallet(wallet.id)}
                 onPress={() => openEditModal(wallet)}
-                style={styles.walletItem}
-              >
+                style={styles.walletItem}>
                 <Text style={styles.walletName}>{wallet.name}</Text>
                 <Text style={styles.walletBalance}>
                   {wallet.balance.toLocaleString('en-US')} {wallet.currency}
@@ -299,9 +331,7 @@ const WalletScreen = () => {
             <TextInput
               style={styles.input}
               value={editingWallet?.name}
-              onChangeText={name =>
-                setEditingWallet({ ...editingWallet, name })
-              }
+              onChangeText={name => setEditingWallet({...editingWallet, name})}
             />
             <Text style={styles.label}>Số dư</Text>
             <TextInput
@@ -315,12 +345,12 @@ const WalletScreen = () => {
                 })
               }
             />
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+            <View style={{flexDirection: 'row', justifyContent: 'flex-end'}}>
               <Pressable onPress={() => setEditModalVisible(false)}>
-                <Text style={{ marginRight: 20, color: 'red' }}>Huỷ</Text>
+                <Text style={{marginRight: 20, color: 'red'}}>Huỷ</Text>
               </Pressable>
               <Pressable onPress={onSaveEdit}>
-                <Text style={{ color: 'blue' }}>Lưu</Text>
+                <Text style={{color: 'blue'}}>Lưu</Text>
               </Pressable>
             </View>
           </View>
@@ -335,9 +365,22 @@ const WalletScreen = () => {
 export default WalletScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 10, backgroundColor: '#fff' },
-  title: { fontSize: 24, fontWeight: '700', textAlign: 'center' },
-  label: { fontSize: 16, fontWeight: '600', marginTop: 12, marginBottom: 6 },
+  container: {
+    flex: 1,
+    paddingHorizontal: 10,
+    backgroundColor: '#fff',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 6,
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
@@ -353,43 +396,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonDisabled: {
-    backgroundColor: '#7da3cc',
+    opacity: 0.6,
   },
   buttonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  totalBalance: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: 'green',
   },
   walletItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 10,
+    borderBottomColor: '#eee',
     borderBottomWidth: 1,
-    borderColor: '#eee',
   },
   walletName: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   walletBalance: {
     fontSize: 16,
     fontWeight: '600',
   },
-  totalBalance: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: 'green',
-    marginBottom: 10,
-  },
   modalContainer: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
     paddingHorizontal: 20,
   },
   modalContent: {
     backgroundColor: '#fff',
-    padding: 20,
     borderRadius: 10,
+    padding: 20,
   },
 });

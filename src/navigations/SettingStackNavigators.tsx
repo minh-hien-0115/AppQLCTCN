@@ -4,7 +4,7 @@ import {LanguageScreen, ProfileScreen, SettingScreen} from '../screens/home';
 import {TouchableOpacity} from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import {ChangePasswordScreen} from '../screens/auth';
-import {ExpenseSavingScreen} from '../screens/spending';
+import {ExpenseSavingScreen, TrashScreen} from '../screens/spending';
 import BanksAndEwallets from '../screens/setting/BanksAndEwallets';
 import HelpAndFeedback from '../screens/setting/HelpAndFeedback';
 import TOSAndPrivacy from '../screens/setting/TOSAndPrivacy';
@@ -58,6 +58,20 @@ const SettingStackNavigators = () => {
         component={ChangePasswordScreen}
         options={({navigation}) => ({
           title: 'Đổi mật khẩu',
+          headerLeft: () => (
+            <TouchableOpacity
+              style={{marginLeft: 15}}
+              onPress={() => navigation.goBack()}>
+              <Feather name="arrow-left" size={24} color="#333" />
+            </TouchableOpacity>
+          ),
+        })}
+      />
+      <Stack.Screen
+        name="TrashScreen"
+        component={TrashScreen}
+        options={({navigation}) => ({
+          title: 'Thùng rác',
           headerLeft: () => (
             <TouchableOpacity
               style={{marginLeft: 15}}

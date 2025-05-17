@@ -15,7 +15,6 @@ import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { AvatarComponents } from '../../components';
 import { useTheme } from '../../constants/ThemeContext';
-import { appColors } from '../../constants/appColors';
 
 const DEFAULT_AVATAR = 'https://i.pravatar.cc/150?img=3';
 
@@ -28,8 +27,6 @@ const HomeScreen = () => {
   const [selectedWallet, setSelectedWallet] = useState<any>(null);
   const [walletModalVisible, setWalletModalVisible] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string>(DEFAULT_AVATAR);
-
-  // Modal xem chi tiết giao dịch
   const [transactionDetailModalVisible, setTransactionDetailModalVisible] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
 
@@ -134,7 +131,7 @@ const HomeScreen = () => {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' đ';
   };
 
-  // Hàm xóa giao dịch
+  //Xóa giao dịch
   const deleteTransaction = async (transactionId: string) => {
     if (!userId || !selectedWallet) return;
     try {
@@ -148,8 +145,6 @@ const HomeScreen = () => {
         .delete();
 
       // Cập nhật lại số dư ví
-      // Lấy dữ liệu giao dịch đã xóa để điều chỉnh số dư
-      // Ở đây tạm thời lấy từ state để đơn giản, nếu cần chính xác có thể query firestore
       const deletedTransaction = transactions.find(t => t.id === transactionId);
       if (!deletedTransaction) return;
 
