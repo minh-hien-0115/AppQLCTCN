@@ -176,15 +176,28 @@ const AddScreen = () => {
       const walletData = walletDoc.data() || {};
       const currentBalance = walletData.balance;
 
-      // Kiểm tra xem balance có phải là số hợp lệ không
       if (typeof currentBalance !== 'number') {
         throw new Error('Số dư ví không hợp lệ hoặc chưa được khởi tạo.');
       }
 
+      const expenseThreshold = walletData.expenseThreshold; // Lấy ngưỡng chi tiêu (nếu có)
       const newBalance =
         type === 'income'
           ? currentBalance + amountNumber
           : currentBalance - amountNumber;
+
+      // Nếu là chi tiêu và có ngưỡng chi tiêu, kiểm tra
+      if (
+        type === 'expense' &&
+        typeof expenseThreshold === 'number' &&
+        amountNumber > expenseThreshold
+      ) {
+        Alert.alert(
+          'Cảnh báo',
+          `Bạn đã chi tiêu vượt ngưỡng ${expenseThreshold.toLocaleString()} VNĐ.`
+        );
+        // Vẫn cho phép tiếp tục lưu giao dịch
+      }
 
       // Tạo giao dịch mới
       const newTransactionRef = walletRef.collection('transactions').doc();
@@ -204,7 +217,7 @@ const AddScreen = () => {
       transaction.update(walletRef, { balance: newBalance });
     });
 
-    Alert.alert('Thành công', 'Giao dịch đã được thêm.');
+    // Alert.alert('Thành công', 'Giao dịch đã được thêm.');
 
     // Reset form
     setCategory('');
@@ -220,6 +233,7 @@ const AddScreen = () => {
     Alert.alert('Lỗi', 'Không thể thêm giao dịch.');
   }
 };
+
 
   return (
     <KeyboardAvoidingView

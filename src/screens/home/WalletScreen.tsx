@@ -261,7 +261,7 @@ const WalletScreen = () => {
         )}
       </TouchableOpacity>
 
-      <Text style={[styles.label, { marginTop: 30 }]}>Tổng số dư</Text>
+      <Text style={[styles.label, { marginTop: 30 }]}>Tổng số dư của các ví</Text>
       <Text style={styles.totalBalance}>
         {totalBalance.toLocaleString('en-US')} {currency}
       </Text>

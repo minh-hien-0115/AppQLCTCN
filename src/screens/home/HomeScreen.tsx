@@ -8,12 +8,14 @@ import {
   Modal,
   TouchableOpacity,
   Pressable,
+  Alert,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { AvatarComponents } from '../../components';
 import { useTheme } from '../../constants/ThemeContext';
+import { appColors } from '../../constants/appColors';
 
 const DEFAULT_AVATAR = 'https://i.pravatar.cc/150?img=3';
 
@@ -26,6 +28,10 @@ const HomeScreen = () => {
   const [selectedWallet, setSelectedWallet] = useState<any>(null);
   const [walletModalVisible, setWalletModalVisible] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string>(DEFAULT_AVATAR);
+
+  // Modal xem chi tiết giao dịch
+  const [transactionDetailModalVisible, setTransactionDetailModalVisible] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
 
   const userId = auth().currentUser?.uid;
 
@@ -128,11 +134,74 @@ const HomeScreen = () => {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' đ';
   };
 
+  // Hàm xóa giao dịch
+  const deleteTransaction = async (transactionId: string) => {
+    if (!userId || !selectedWallet) return;
+    try {
+      await firestore()
+        .collection('users')
+        .doc(userId)
+        .collection('wallets')
+        .doc(selectedWallet.id)
+        .collection('transactions')
+        .doc(transactionId)
+        .delete();
+
+      // Cập nhật lại số dư ví
+      // Lấy dữ liệu giao dịch đã xóa để điều chỉnh số dư
+      // Ở đây tạm thời lấy từ state để đơn giản, nếu cần chính xác có thể query firestore
+      const deletedTransaction = transactions.find(t => t.id === transactionId);
+      if (!deletedTransaction) return;
+
+      let newBalance = selectedWallet.balance;
+      if (deletedTransaction.type === 'income') {
+        newBalance -= deletedTransaction.amount;
+      } else {
+        newBalance += deletedTransaction.amount;
+      }
+
+      await firestore()
+        .collection('users')
+        .doc(userId)
+        .collection('wallets')
+        .doc(selectedWallet.id)
+        .update({ balance: newBalance });
+
+      Alert.alert('Thành công', 'Giao dịch đã được xóa.');
+    } catch (error) {
+      console.error('Lỗi khi xóa giao dịch:', error);
+      Alert.alert('Lỗi', 'Không thể xóa giao dịch.');
+    }
+  };
+
   const renderTransaction = ({item}: {item: any}) => {
     const color = item.type === 'income' ? '#4caf50' : '#f44336';
 
     return (
-      <View style={styles.transactionItem}>
+      <Pressable
+        onPress={() => {
+          setSelectedTransaction(item);
+          setTransactionDetailModalVisible(true);
+        }}
+        onLongPress={() => {
+          Alert.alert(
+            'Xác nhận',
+            'Bạn có chắc muốn xóa giao dịch này không?',
+            [
+              {
+                text: 'Hủy',
+                style: 'cancel',
+              },
+              {
+                text: 'Xóa',
+                style: 'destructive',
+                onPress: () => deleteTransaction(item.id),
+              },
+            ],
+            { cancelable: true }
+          );
+        }}
+        style={styles.transactionItem}>
         <Icon
           name={item.icon || 'wallet'}
           size={26}
@@ -147,7 +216,7 @@ const HomeScreen = () => {
           {item.type === 'income' ? '+' : '-'}
           {formatCurrency(item.amount)}
         </Text>
-      </View>
+      </Pressable>
     );
   };
 
@@ -281,6 +350,57 @@ const HomeScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Modal chi tiết giao dịch */}
+      <Modal
+        visible={transactionDetailModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTransactionDetailModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, {maxHeight: '50%'}]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chi tiết giao dịch</Text>
+              <TouchableOpacity
+                onPress={() => setTransactionDetailModalVisible(false)}>
+                <Icon name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            {selectedTransaction ? (
+              <View style={{paddingHorizontal: 10}}>
+                <Text style={{fontWeight: '600', fontSize: 16, marginBottom: 8}}>
+                  Danh mục: {selectedTransaction.category}
+                </Text>
+                <Text style={{marginBottom: 6}}>
+                  Số tiền:{' '}
+                  <Text style={{color: selectedTransaction.type === 'income' ? '#4caf50' : '#f44336'}}>
+                    {selectedTransaction.type === 'income' ? '+' : '-'}
+                    {formatCurrency(selectedTransaction.amount)}
+                  </Text>
+                </Text>
+                {selectedTransaction.note ? (
+                  <Text style={{marginBottom: 6}}>
+                    Ghi chú: {selectedTransaction.note}
+                  </Text>
+                ) : null}
+                <Text style={{marginBottom: 6}}>
+                  Loại: {selectedTransaction.type === 'income' ? 'Thu nhập' : 'Chi tiêu'}
+                </Text>
+                {selectedTransaction.createdAt ? (
+                  <Text>
+                    Thời gian:{' '}
+                    {selectedTransaction.createdAt.toDate
+                      ? selectedTransaction.createdAt.toDate().toLocaleString()
+                      : new Date(selectedTransaction.createdAt).toLocaleString()}
+                  </Text>
+                ) : null}
+              </View>
+            ) : (
+              <Text>Không có dữ liệu giao dịch</Text>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -408,23 +528,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderColor: '#eee',
+    borderBottomWidth: 0.5,
+    borderColor: '#ddd',
   },
   walletName: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#222',
   },
   welcomeRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
-    paddingHorizontal: 10,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    elevation: 2,
-    marginTop: 5,
+    alignItems: 'center',
+    marginVertical: 12,
   },
 });
