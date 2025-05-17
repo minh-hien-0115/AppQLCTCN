@@ -2,6 +2,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Add, Chart, Home, User, Wallet } from 'iconsax-react-nativejs';
 import React from 'react';
 import { AddScreen, HomeScreen, SettingScreen, StatisticalScreen, WalletScreen } from '../screens/home';
+import SettingStackNavigators from './SettingStackNavigators';
 
 
 const Tab = createBottomTabNavigator();
@@ -39,7 +40,7 @@ const TabNavigators = () => {
       />
       <Tab.Screen
         name="Cài đặt"
-        component={SettingScreen}
+        component={SettingStackNavigators}
         options={{
           tabBarIcon: ({color}) => <User color={color} size={23} variant="Bold" />,
         }}
