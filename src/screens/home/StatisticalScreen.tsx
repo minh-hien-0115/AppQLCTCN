@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -6,16 +6,20 @@ import {
   ActivityIndicator,
   Dimensions,
   ScrollView,
+  Platform,
+  TouchableOpacity,
 } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
-import { PieChart, LineChart } from 'react-native-chart-kit';
-import { Picker } from '@react-native-picker/picker';
+import {PieChart, LineChart} from 'react-native-chart-kit';
+import {Picker} from '@react-native-picker/picker';
 import dayjs from 'dayjs';
+import weekOfYear from 'dayjs/plugin/weekOfYear';
 import auth from '@react-native-firebase/auth';
-import { appColors } from '../../constants/appColors';
+import {appColors} from '../../constants/appColors';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
+dayjs.extend(weekOfYear);
 const screenWidth = Dimensions.get('window').width;
-
 const getRandomColor = () => {
   const letters = '0123456789ABCDEF';
   let color = '#';
@@ -31,10 +35,29 @@ const StatisticalScreen = () => {
   const [filteredTransactions, setFilteredTransactions] = useState<any[]>([]);
   const [wallets, setWallets] = useState<any[]>([]);
   const [selectedWallet, setSelectedWallet] = useState('all');
-  const [timeFilter, setTimeFilter] = useState('all');
+  const [timeFilter, setTimeFilter] = useState<'all' | 'day' | 'week' | 'month' | 'year'>('all');
   const [typeFilter, setTypeFilter] = useState('both');
   const [chartType, setChartType] = useState<'pie' | 'line' | 'both'>('both');
+  const [selectedDate, setSelectedDate] = useState(new Date()); // cho ngày
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
+  const [selectedYear, setSelectedYear] = useState(dayjs().year());
+  const [selectedMonth, setSelectedMonth] = useState(dayjs().month() + 1); // 1->12
+
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null); // tuần trong năm
+
+  // Tạo ds năm dùng picker
+  const currentYear = dayjs().year();
+  const years = Array.from({length: 10}, (_, i) => currentYear - 5 + i);
+
+  // Ds tháng 1->12
+  const months = Array.from({length: 12}, (_, i) => i + 1);
+
+  // Ds tuần trong năm
+  const weeksInYear = 53;
+  const weeks = Array.from({length: weeksInYear}, (_, i) => i + 1);
+
+  // === Load wallets ===
   useEffect(() => {
     const userId = auth().currentUser?.uid;
     if (!userId) return;
@@ -54,6 +77,7 @@ const StatisticalScreen = () => {
     return () => unsubscribeWallets();
   }, []);
 
+  // === Load transactions ===
   useEffect(() => {
     const userId = auth().currentUser?.uid;
     if (!userId) return;
@@ -63,7 +87,9 @@ const StatisticalScreen = () => {
     const unsubscribes: (() => void)[] = [];
 
     const listenWallets =
-      selectedWallet === 'all' ? wallets : wallets.filter(w => w.id === selectedWallet);
+      selectedWallet === 'all'
+        ? wallets
+        : wallets.filter(w => w.id === selectedWallet);
 
     if (listenWallets.length === 0) {
       setTransactions([]);
@@ -104,44 +130,80 @@ const StatisticalScreen = () => {
     };
   }, [wallets, selectedWallet]);
 
+  // === Lọc transactions dựa trên filter + chọn thời gian chi tiết ===
   useEffect(() => {
-    const now = dayjs();
     let filtered = transactions;
 
+    // Lọc ví
     if (selectedWallet !== 'all') {
       filtered = filtered.filter(t => t.walletId === selectedWallet);
     }
 
+    // Lọc loại giao dịch
+    if (typeFilter !== 'both') {
+      filtered = filtered.filter(t => t.type === typeFilter);
+    }
+
+    // Lọc theo thời gian chung
     if (timeFilter !== 'all') {
       filtered = filtered.filter(t => {
         const tDate = dayjs(t.date);
+
         switch (timeFilter) {
           case 'day':
-            return tDate.isSame(now, 'day');
+            // So sánh với selectedDate (ngày cụ thể)
+            return tDate.isSame(dayjs(selectedDate), 'day');
+
           case 'week':
-            return tDate.isSame(now, 'week');
+            if (selectedWeek === null) return true; // chưa chọn tuần => show hết
+            // So sánh tuần và năm
+            const weekNum = tDate.week();
+            const yearNum = tDate.year();
+            return yearNum === selectedYear && weekNum === selectedWeek;
+
           case 'month':
-            return tDate.isSame(now, 'month');
+            // So sánh tháng + năm
+            return (
+              tDate.month() + 1 === selectedMonth &&
+              tDate.year() === selectedYear
+            );
+
           case 'year':
-            return tDate.isSame(now, 'year');
+            // So sánh năm
+            return tDate.year() === selectedYear;
+
           default:
             return true;
         }
       });
     }
 
-    if (typeFilter !== 'both') {
-      filtered = filtered.filter(t => t.type === typeFilter);
-    }
-
     setFilteredTransactions(filtered);
-  }, [transactions, selectedWallet, timeFilter, typeFilter]);
+  }, [
+    transactions,
+    selectedWallet,
+    timeFilter,
+    typeFilter,
+    selectedDate,
+    selectedYear,
+    selectedMonth,
+    selectedWeek,
+  ]);
 
-  const incomeTransactions = filteredTransactions.filter(t => t.type === 'income');
-  const expenseTransactions = filteredTransactions.filter(t => t.type === 'expense');
-
-  const totalIncome = incomeTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-  const totalExpense = expenseTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
+  const incomeTransactions = filteredTransactions.filter(
+    t => t.type === 'income',
+  );
+  const expenseTransactions = filteredTransactions.filter(
+    t => t.type === 'expense',
+  );
+  const totalIncome = incomeTransactions.reduce(
+    (sum, t) => sum + Number(t.amount),
+    0,
+  );
+  const totalExpense = expenseTransactions.reduce(
+    (sum, t) => sum + Number(t.amount),
+    0,
+  );
   const balance = totalIncome + totalExpense;
 
   const selectedWalletObj = wallets.find(w => w.id === selectedWallet);
@@ -161,10 +223,12 @@ const StatisticalScreen = () => {
     {},
   );
 
-  const categoryList = Object.entries(amountByCategory).map(([category, amount]) => ({
-    category,
-    amount,
-  }));
+  const categoryList = Object.entries(amountByCategory).map(
+    ([category, amount]) => ({
+      category,
+      amount,
+    }),
+  );
 
   const formatCurrency = (num: number) => num.toLocaleString('vi-VN') + ' đ';
 
@@ -177,11 +241,12 @@ const StatisticalScreen = () => {
     return num.toLocaleString('vi-VN');
   };
 
-
   const totalAmount = categoryList.reduce((sum, item) => sum + item.amount, 0);
 
   const pieChartData = categoryList.map(item => {
-    const percent = totalAmount ? ((item.amount / totalAmount) * 100).toFixed(1) : '0.0';
+    const percent = totalAmount
+      ? ((item.amount / totalAmount) * 100).toFixed(1)
+      : '0.0';
     return {
       name: `${item.category} (${percent}%)`,
       amount: item.amount,
@@ -191,11 +256,14 @@ const StatisticalScreen = () => {
     };
   });
 
-  const categoryColorsMap = pieChartData.reduce<Record<string, string>>((acc, item) => {
-    const category = item.name.split(' (')[0];
-    acc[category] = item.color;
-    return acc;
-  }, {});
+  const categoryColorsMap = pieChartData.reduce<Record<string, string>>(
+    (acc, item) => {
+      const category = item.name.split(' (')[0];
+      acc[category] = item.color;
+      return acc;
+    },
+    {},
+  );
 
   const Legend = ({
     items,
@@ -209,7 +277,7 @@ const StatisticalScreen = () => {
     <View style={styles.legendContainerColumn}>
       {items.map((item, idx) => (
         <View key={idx} style={styles.legendItemColumn}>
-          <View style={[styles.legendColor, { backgroundColor: colors[idx] }]} />
+          <View style={[styles.legendColor, {backgroundColor: colors[idx]}]} />
           <Text style={styles.legendLabel}>{item}</Text>
           <Text style={styles.legendAmount}>{formatCurrency(amounts[idx])}</Text>
           <View style={styles.legendDivider} />
@@ -218,8 +286,10 @@ const StatisticalScreen = () => {
     </View>
   );
 
-  const last7Days = Array.from({ length: 7 }, (_, i) =>
-    dayjs().subtract(3 - i, 'day').format('DD/MM'),
+  const last7Days = Array.from({length: 7}, (_, i) =>
+    dayjs()
+      .subtract(3 - i, 'day')
+      .format('DD/MM'),
   );
 
   const incomeData = last7Days.map(day =>
@@ -230,7 +300,9 @@ const StatisticalScreen = () => {
 
   const expenseData = last7Days.map(day =>
     filteredTransactions
-      .filter(t => dayjs(t.date).format('DD/MM') === day && t.type === 'expense')
+      .filter(
+        t => dayjs(t.date).format('DD/MM') === day && t.type === 'expense',
+      )
       .reduce((sum, t) => sum + Number(t.amount), 0),
   );
 
@@ -258,141 +330,255 @@ const StatisticalScreen = () => {
     legend: ['Thu nhập', 'Chi tiêu', 'Tổng'],
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1e90ff" />
-      </View>
-    );
-  }
+  const renderTimeDetailPicker = () => {
+    switch (timeFilter) {
+      case 'day':
+        return (
+          <>
+            <TouchableOpacity
+              style={styles.datePickerButton}
+              onPress={() => setShowDatePicker(true)}>
+              <Text style={styles.datePickerButtonText}>
+                Chọn ngày: {dayjs(selectedDate).format('DD/MM/YYYY')}
+              </Text>
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={selectedDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, date) => {
+                  setShowDatePicker(Platform.OS === 'ios');
+                  if (date) setSelectedDate(date);
+                }}
+              />
+            )}
+          </>
+        );
+
+      case 'week':
+        return (
+          <>
+            <View style={{marginBottom: 8}}>
+              <Text style={styles.pickerLabel}>Chọn năm:</Text>
+              <Picker
+                selectedValue={selectedYear}
+                style={styles.picker}
+                onValueChange={value => {
+                  setSelectedYear(value);
+                  setSelectedWeek(null); // reset tuần khi đổi năm
+                }}>
+                {years.map(y => (
+                  <Picker.Item key={y} label={y.toString()} value={y} />
+                ))}
+              </Picker>
+            </View>
+            <View style={{marginBottom: 15}}>
+              <Text style={styles.pickerLabel}>Chọn tuần:</Text>
+              <Picker
+                selectedValue={selectedWeek}
+                style={styles.picker}
+                onValueChange={value => setSelectedWeek(value)}>
+                <Picker.Item label="Chọn tuần" value={null} />
+                {weeks.map(w => (
+                  <Picker.Item key={w} label={`Tuần ${w}`} value={w} />
+                ))}
+              </Picker>
+            </View>
+          </>
+        );
+
+      case 'month':
+        return (
+          <View
+            style={{
+              flexDirection: 'row',
+              marginBottom: 15,
+              alignItems: 'center',
+            }}>
+            <View style={{flex: 1, marginRight: 10}}>
+              <Text style={styles.pickerLabel}>Chọn tháng:</Text>
+              <Picker
+                selectedValue={selectedMonth}
+                style={styles.picker}
+                onValueChange={value => setSelectedMonth(value)}>
+                {months.map(m => (
+                  <Picker.Item key={m} label={`${m}`} value={m} />
+                ))}
+              </Picker>
+            </View>
+            <View style={{flex: 1}}>
+              <Text style={styles.pickerLabel}>Chọn năm:</Text>
+              <Picker
+                selectedValue={selectedYear}
+                style={styles.picker}
+                onValueChange={value => setSelectedYear(value)}>
+                {years.map(y => (
+                  <Picker.Item key={y} label={y.toString()} value={y} />
+                ))}
+              </Picker>
+            </View>
+          </View>
+        );
+
+      case 'year':
+        return (
+          <View style={{marginBottom: 15}}>
+            <Text style={styles.pickerLabel}>Chọn năm:</Text>
+            <Picker
+              selectedValue={selectedYear}
+              style={styles.picker}
+              onValueChange={value => setSelectedYear(value)}>
+              {years.map(y => (
+                <Picker.Item key={y} label={y.toString()} value={y} />
+              ))}
+            </Picker>
+          </View>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Thống kê tài chính</Text>
+      <View style={styles.header}>
+        <Text style={styles.headerText}>Thống kê chi tiêu</Text>
+      </View>
 
-      <View style={styles.summaryBox}>
-        <Text style={[styles.label, { fontWeight: 'bold' }]}>
-          Số dư: {wallets.length === 0 ? 'Đang tải...' : formatCurrency(walletBalance)}
+      <View style={styles.balanceContainer}>
+        <Text style={styles.balanceText}>
+          Số dư: {formatCurrency(walletBalance)}
         </Text>
-        <Text style={styles.label}>Tổng thu nhập: {formatCurrency(totalIncome)}</Text>
-        <Text style={styles.label}>Tổng chi tiêu: {formatCurrency(totalExpense)}</Text>
+        <Text style={styles.balanceDetailText}>
+          Thu nhập: {formatCurrency(totalIncome)}
+        </Text>
+        <Text style={styles.balanceDetailText}>
+          Chi tiêu: {formatCurrency(totalExpense)}
+        </Text>
       </View>
 
-      <View style={{ marginBottom: 15 }}>
-        <View style={styles.pickerColumn}>
-          <Text style={styles.pickerLabel}>Chọn ví:</Text>
-          <Picker
-            selectedValue={selectedWallet}
-            style={styles.picker}
-            onValueChange={value => setSelectedWallet(value)}
-          >
-            <Picker.Item label="Tất cả ví" value="all" />
-            {wallets.map(wallet => (
-              <Picker.Item key={wallet.id} label={wallet.name} value={wallet.id} />
-            ))}
-          </Picker>
-        </View>
-      </View>
+      <View style={styles.filterContainer}>
+        <Text style={styles.label}>Ví:</Text>
+        <Picker
+          selectedValue={selectedWallet}
+          onValueChange={value => setSelectedWallet(value)}
+          style={styles.picker}>
+          <Picker.Item label="Tất cả" value="all" />
+          {wallets.map(wallet => (
+            <Picker.Item
+              key={wallet.id}
+              label={wallet.name}
+              value={wallet.id}
+            />
+          ))}
+        </Picker>
 
-      <View style={styles.pickerRow}>
-        <View style={styles.pickerColumn}>
-          <Text style={styles.pickerLabel}>Thời gian:</Text>
-          <Picker
-            selectedValue={timeFilter}
-            style={styles.picker}
-            onValueChange={value => setTimeFilter(value)}
-          >
-            <Picker.Item label="Tất cả" value="all" />
-            <Picker.Item label="Hôm nay" value="day" />
-            <Picker.Item label="Tuần này" value="week" />
-            <Picker.Item label="Tháng này" value="month" />
-            <Picker.Item label="Năm nay" value="year" />
-          </Picker>
-        </View>
+        <Text style={styles.label}>Thời gian:</Text>
+        <Picker
+          selectedValue={timeFilter}
+          onValueChange={value => setTimeFilter(value)}
+          style={styles.picker}>
+          <Picker.Item label="Tất cả" value="all" />
+          <Picker.Item label="Ngày" value="day" />
+          <Picker.Item label="Tuần" value="week" />
+          <Picker.Item label="Tháng" value="month" />
+          <Picker.Item label="Năm" value="year" />
+        </Picker>
 
-        <View style={styles.pickerColumn}>
-          <Text style={styles.pickerLabel}>Loại giao dịch:</Text>
-          <Picker
-            selectedValue={typeFilter}
-            style={styles.picker}
-            onValueChange={value => setTypeFilter(value)}
-          >
-            <Picker.Item label="Thu nhập và chi tiêu" value="both" />
-            <Picker.Item label="Thu nhập" value="income" />
-            <Picker.Item label="Chi tiêu" value="expense" />
-          </Picker>
-        </View>
-      </View>
+        {renderTimeDetailPicker()}
 
-      <View style={styles.pickerColumn}>
-        <Text style={styles.pickerLabel}>Loại biểu đồ:</Text>
+        <Text style={styles.label}>Loại giao dịch:</Text>
+        <Picker
+          selectedValue={typeFilter}
+          onValueChange={value => setTypeFilter(value)}
+          style={styles.picker}>
+          <Picker.Item label="Cả hai (Thu nhập và Chi tiêu)" value="both" />
+          <Picker.Item label="Thu nhập" value="income" />
+          <Picker.Item label="Chi tiêu" value="expense" />
+        </Picker>
+
+        <Text style={styles.label}>Loại biểu đồ:</Text>
         <Picker
           selectedValue={chartType}
-          style={styles.picker}
-          onValueChange={(value: 'pie' | 'line' | 'both') => setChartType(value)}
-        >
+          onValueChange={value => setChartType(value)}
+          style={styles.picker}>
+          <Picker.Item label="Cả hai" value="both" />
           <Picker.Item label="Biểu đồ tròn" value="pie" />
           <Picker.Item label="Biểu đồ đường" value="line" />
-          <Picker.Item label="Cả hai" value="both" />
         </Picker>
       </View>
 
-      {(chartType === 'pie' || chartType === 'both') &&
-        (categoryList.length > 0 ? (
-          <>
-            <PieChart
-              data={pieChartData}
-              width={screenWidth - 20}
-              height={220}
-              hasLegend={false}
-              chartConfig={{
-                backgroundGradientFrom: '#fff',
-                backgroundGradientTo: '#fff',
-                color: (opacity = 1) => `rgba(0,0,0,${opacity})`,
-                labelColor: (opacity = 1) => `rgba(0,0,0,${opacity})`,
-              }}
-              accessor="amount"
-              backgroundColor="transparent"
-              paddingLeft="15"
-              absolute
-            />
-            <Legend
-              items={categoryList.map(c => c.category)}
-              colors={categoryList.map(c => categoryColorsMap[c.category])}
-              amounts={categoryList.map(c => c.amount)}
-            />
-          </>
-        ) : (
-          <Text style={{ textAlign: 'center', marginTop: 20, color: '#666' }}>
-            Không có dữ liệu để hiển thị biểu đồ
-          </Text>
-        ))}
-
-      {(chartType === 'line' || chartType === 'both') && (
+      {loading ? (
+        <ActivityIndicator size="large" color={appColors.primary} />
+      ) : (
         <>
-          {/* <Text style={[styles.title, { fontSize: 20, marginTop: 30 }]}>
-            Biểu đồ thu chi 7 ngày qua
-          </Text> */}
-        <ScrollView horizontal style={{marginTop: 15}} showsHorizontalScrollIndicator={false} >
-          <LineChart
-            data={lineChartData}
-            width={Math.max(last7Days.length * 60, screenWidth - 20)}
-            height={256}
-            chartConfig={{
-              backgroundGradientFrom: '#fff',
-              backgroundGradientTo: '#fff',
-              decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(33, 150, 243, ${opacity})`,
-              labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-            }}
-            bezier
-            style={{
-              marginVertical: 8,
-              borderRadius: 8,
-            }}
-            formatYLabel={formatShortCurrency}
-          />
-          </ScrollView>
+          {(chartType === 'pie' || chartType === 'both') &&
+            pieChartData.length > 0 && (
+              <View style={styles.chartContainer}>
+                <Text style={styles.chartTitle}>
+                  Phân bổ chi tiêu theo danh mục
+                </Text>
+                <PieChart
+                  data={pieChartData}
+                  width={screenWidth}
+                  hasLegend={false}
+                  height={220}
+                  chartConfig={{
+                    backgroundGradientFrom: '#fff',
+                    backgroundGradientTo: '#fff',
+                    color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                  }}
+                  accessor="amount"
+                  backgroundColor="transparent"
+                  paddingLeft="15"
+                  absolute
+                />
+                <Legend
+                  items={categoryList.map(i => i.category)}
+                  colors={pieChartData.map(i => i.color)}
+                  amounts={categoryList.map(i => i.amount)}
+                />
+              </View>
+            )}
+
+          {(chartType === 'line' || chartType === 'both') && (
+            <>
+              <ScrollView
+                horizontal
+                style={{marginTop: 15}}
+                showsHorizontalScrollIndicator={false}>
+                <View style={styles.chartContainer}>
+                  {/* <Text style={styles.chartTitle}>
+                    Biểu đồ thu nhập - chi tiêu 7 ngày gần nhất
+                  </Text> */}
+                  <LineChart
+                    data={lineChartData}
+                    width={Math.max(last7Days.length * 60, screenWidth - 20)}
+                    height={256}
+                    chartConfig={{
+                      backgroundGradientFrom: '#fff',
+                      backgroundGradientTo: '#fff',
+                      color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                      labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                      propsForDots: {
+                        r: '4',
+                        strokeWidth: '1',
+                        stroke: '#fff',
+                      },
+                    }}
+                    bezier
+                    style={{
+                      marginVertical: 8,
+                      borderRadius: 16,
+                    }}
+                    formatYLabel={formatShortCurrency}
+                  />
+                </View>
+              </ScrollView>
+            </>
+          )}
         </>
       )}
     </ScrollView>
@@ -404,82 +590,121 @@ export default StatisticalScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 10,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: appColors.background,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  header: {
+    padding: 16,
+    // backgroundColor: appColors.primary,
     alignItems: 'center',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#222',
-    textAlign: 'center',
+  headerText: {
+    fontSize: 20,
+    // color: 'white',
   },
-  summaryBox: {
-    backgroundColor: appColors.white,
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 15,
-    elevation: 1,
+  filterContainer: {
+    paddingHorizontal: 16,
   },
   label: {
     fontSize: 16,
-    marginBottom: 5,
-    color: appColors.text,
-  },
-  pickerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  pickerColumn: {
-    flex: 1,
-    marginRight: 10,
-  },
-  pickerLabel: {
-    fontSize: 16,
-    marginBottom: 5,
-    color: '#555',
+    marginTop: 12,
+    marginBottom: 4,
+    color: appColors.textPrimary,
   },
   picker: {
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
+    borderRadius: 4,
+    ...Platform.select({
+      android: {
+        color: 'black',
+      },
+    }),
+  },
+  datePickerButton: {
+    padding: 10,
+    backgroundColor: appColors.primary,
     borderRadius: 6,
+    marginVertical: 8,
+  },
+  datePickerButtonText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  balanceContainer: {
+    padding: 16,
+    backgroundColor: 'white',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    borderRadius: 10,
+    elevation: 4,
+  },
+  balanceText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: appColors.textPrimary,
+  },
+  balanceDetailText: {
+    fontSize: 15,
+    marginTop: 6,
+    color: appColors.textSecondary,
+  },
+  chartContainer: {
+    marginHorizontal: 16,
+    marginVertical: 12,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    elevation: 4,
+  },
+  chartTitle: {
+    textAlign: 'center',
+    fontWeight: '600',
+    fontSize: 16,
+    marginBottom: 12,
+    color: appColors.textPrimary,
   },
   legendContainerColumn: {
     marginTop: 10,
+    paddingHorizontal: 20,
     flexDirection: 'column',
   },
   legendItemColumn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
     borderBottomWidth: 2,
     borderBottomColor: appColors.border,
     paddingBottom: 3,
   },
   legendColor: {
-    width: 16,
-    height: 16,
+    width: 20,
+    height: 20,
     borderRadius: 4,
     marginRight: 8,
   },
   legendLabel: {
-    fontSize: 14,
-    color: '#333',
     flex: 1,
+    fontSize: 14,
+    color: appColors.textPrimary,
   },
   legendAmount: {
     fontSize: 14,
-    color: '#333',
+    color: appColors.textSecondary,
     fontWeight: '600',
   },
   legendDivider: {
+    // height: 1,
+    // backgroundColor: '#eee',
+    // flex: 1,
+    // marginLeft: 8,
     marginTop: 6,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+  },
+  pickerLabel: {
+    fontSize: 14,
+    color: appColors.textPrimary,
+    marginBottom: 4,
   },
 });
