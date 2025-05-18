@@ -460,7 +460,8 @@ const StatisticalScreen = () => {
       </View>
 
       <View style={styles.filterContainer}>
-        <Text style={styles.label}>Ví:</Text>
+        <View>
+          <Text style={styles.label}>Ví:</Text>
         <Picker
           selectedValue={selectedWallet}
           onValueChange={value => setSelectedWallet(value)}
@@ -486,6 +487,7 @@ const StatisticalScreen = () => {
           <Picker.Item label="Tháng" value="month" />
           <Picker.Item label="Năm" value="year" />
         </Picker>
+        </View>
 
         {renderTimeDetailPicker()}
 
