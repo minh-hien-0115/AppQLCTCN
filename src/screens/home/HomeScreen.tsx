@@ -72,6 +72,64 @@ const categoryIcons: Record<string, string> = {
   'Khác': 'dots-horizontal',
 };
 
+const walletNameIcons: Record<string, string> = {
+  'mua sắm': 'tshirt-crew',
+  'đi lại': 'motorbike',
+  'ăn sáng': 'hamburger',
+  'ăn trưa': 'hamburger',
+  'ăn tối': 'hamburger',
+  'ăn chiều': 'hamburger',
+  'ăn nhẹ': 'hamburger',
+  'xe buýt': 'bus',
+  'taxi': 'car',
+  'xe máy': 'motorbike',
+  'ô tô': 'car',
+  'quần áo': 'tshirt-crew',
+  'giày dép': 'shoe-formal',
+  'mỹ phẩm': 'lipstick',
+  'sức khoẻ': 'medical-bag',
+  'khám bệnh': 'medical-bag',
+  'thuốc': 'pill',
+  'giải trí': 'gamepad-variant',
+  'xem phim': 'movie',
+  'ca nhạc': 'music',
+  'thể thao': 'badminton',
+  'bóng đá': 'soccer',
+  'cầu lông': 'badminton',
+  'bơi lội': 'swim',
+  'điện tử': 'cellphone',
+  'điện thoại': 'cellphone',
+  'laptop': 'laptop',
+  'máy tính bảng': 'tablet',
+  'giáo dục': 'book-open-page-variant',
+  'học phí': 'book-open-page-variant',
+  'sách vở': 'book',
+  'du lịch': 'airplane',
+  'khách sạn': 'bed',
+  'vé máy bay': 'airplane',
+  'thú cưng': 'dog',
+  'chó': 'dog',
+  'mèo': 'cat',
+  'lương': 'cash',
+  'tiết kiệm': 'piggy-bank',
+  'tiền lãi': 'bank',
+  'quà tặng': 'gift',
+  'y tế': 'hospital-box',
+  'gia đình': 'account-group',
+  'internet': 'wifi',
+  'điện nước': 'flash',
+  'cafe / trà sữa': 'coffee',
+  'sách / tài liệu': 'book',
+  'trang trí nhà': 'sofa',
+  'khác': 'dots-horizontal',
+};
+
+function getWalletIcon(name = '', iconProp: string | undefined) {
+  if (iconProp) return iconProp;
+  const key = name.trim().toLowerCase();
+  return walletNameIcons[key] || 'wallet';
+}
+
 const HomeScreen = ({ navigation }: any) => {
   const { colors, theme } = useTheme();
   const [displayName, setDisplayName] = useState('');
@@ -292,7 +350,7 @@ const HomeScreen = ({ navigation }: any) => {
                     setWalletModalVisible(false);
                   }}>
                   <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                    <Icon name={wallet.icon || 'wallet'} size={20} color="#1976d2" style={{marginRight: 8}} />
+                    <Icon name={getWalletIcon(wallet.name, wallet.icon)} size={20} color="#1976d2" style={{marginRight: 8}} />
                     <Text style={styles.walletName}>{wallet.name}</Text>
                   </View>
                   <Text>{formatCurrency(wallet.balance)}</Text>
@@ -309,7 +367,7 @@ const HomeScreen = ({ navigation }: any) => {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.welcomeRow}>
         <Text style={[styles.welcome, { color: colors.text }]}>Xin chào, {displayName}</Text>
-        <AvatarComponents uri={avatarUri} />
+        <AvatarComponents uri={avatarUri} size={40} />
       </View>
 
       <View style={[styles.summaryBox, { backgroundColor: theme === 'dark' ? '#1e1e1e' : '#fff' }]}>
@@ -405,7 +463,7 @@ const HomeScreen = ({ navigation }: any) => {
                     setWalletModalVisible(false);
                   }}>
                   <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                    <Icon name={wallet.icon || 'wallet'} size={20} color="#1976d2" style={{marginRight: 8}} />
+                    <Icon name={getWalletIcon(wallet.name, wallet.icon)} size={20} color="#1976d2" style={{marginRight: 8}} />
                     <Text style={styles.walletName}>{wallet.name}</Text>
                   </View>
                   <Text>{formatCurrency(wallet.balance)}</Text>
