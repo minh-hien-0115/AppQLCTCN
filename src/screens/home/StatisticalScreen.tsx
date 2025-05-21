@@ -17,6 +17,7 @@ import weekOfYear from 'dayjs/plugin/weekOfYear';
 import auth from '@react-native-firebase/auth';
 import {appColors} from '../../constants/appColors';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useTheme } from '../../constants/ThemeContext';
 
 dayjs.extend(weekOfYear);
 const screenWidth = Dimensions.get('window').width;
@@ -30,6 +31,7 @@ const getRandomColor = () => {
 };
 
 const StatisticalScreen = () => {
+  const { colors, theme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<any[]>([]);
@@ -38,13 +40,12 @@ const StatisticalScreen = () => {
   const [timeFilter, setTimeFilter] = useState<'all' | 'day' | 'week' | 'month' | 'year'>('all');
   const [typeFilter, setTypeFilter] = useState('both');
   const [chartType, setChartType] = useState<'pie' | 'line' | 'both'>('both');
-  const [selectedDate, setSelectedDate] = useState(new Date()); // cho ngày
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const [selectedYear, setSelectedYear] = useState(dayjs().year());
-  const [selectedMonth, setSelectedMonth] = useState(dayjs().month() + 1); // 1->12
-
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(null); // tuần trong năm
+  const [selectedMonth, setSelectedMonth] = useState(dayjs().month() + 1);
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
 
   // Tạo ds năm dùng picker
   const currentYear = dayjs().year();
@@ -273,18 +274,21 @@ const StatisticalScreen = () => {
     items: string[];
     colors: string[];
     amounts: number[];
-  }) => (
-    <View style={styles.legendContainerColumn}>
-      {items.map((item, idx) => (
-        <View key={idx} style={styles.legendItemColumn}>
-          <View style={[styles.legendColor, {backgroundColor: colors[idx]}]} />
-          <Text style={styles.legendLabel}>{item}</Text>
-          <Text style={styles.legendAmount}>{formatCurrency(amounts[idx])}</Text>
-          <View style={styles.legendDivider} />
-        </View>
-      ))}
-    </View>
-  );
+  }) => {
+    const { colors: themeColors } = useTheme();
+    return (
+      <View style={styles.legendContainerColumn}>
+        {items.map((item, idx) => (
+          <View key={idx} style={styles.legendItemColumn}>
+            <View style={[styles.legendColor, {backgroundColor: colors[idx]}]} />
+            <Text style={[styles.legendLabel, { color: themeColors.text }]}>{item}</Text>
+            <Text style={[styles.legendAmount, { color: themeColors.text }]}>{formatCurrency(amounts[idx])}</Text>
+            <View style={[styles.legendDivider, { borderBottomColor: themeColors.text + '20' }]} />
+          </View>
+        ))}
+      </View>
+    );
+  };
 
   const last7Days = Array.from({length: 7}, (_, i) =>
     dayjs()
@@ -331,6 +335,7 @@ const StatisticalScreen = () => {
   };
 
   const renderTimeDetailPicker = () => {
+    const { colors: themeColors, theme } = useTheme();
     switch (timeFilter) {
       case 'day':
         return (
@@ -360,30 +365,36 @@ const StatisticalScreen = () => {
         return (
           <>
             <View style={{marginBottom: 8}}>
-              <Text style={styles.pickerLabel}>Chọn năm:</Text>
-              <Picker
-                selectedValue={selectedYear}
-                style={styles.picker}
-                onValueChange={value => {
-                  setSelectedYear(value);
-                  setSelectedWeek(null); // reset tuần khi đổi năm
-                }}>
-                {years.map(y => (
-                  <Picker.Item key={y} label={y.toString()} value={y} />
-                ))}
-              </Picker>
+              <Text style={[styles.pickerLabel, { color: themeColors.text }]}>Chọn năm:</Text>
+              <View style={[styles.pickerContainer, { backgroundColor: theme === 'dark' ? '#333' : '#f5f5f5' }]}>
+                <Picker
+                  selectedValue={selectedYear}
+                  style={[styles.picker, { color: themeColors.text }]}
+                  dropdownIconColor={themeColors.text}
+                  onValueChange={value => {
+                    setSelectedYear(value);
+                    setSelectedWeek(null);
+                  }}>
+                  {years.map(y => (
+                    <Picker.Item key={y} label={y.toString()} value={y} color={themeColors.text} />
+                  ))}
+                </Picker>
+              </View>
             </View>
             <View style={{marginBottom: 15}}>
-              <Text style={styles.pickerLabel}>Chọn tuần:</Text>
-              <Picker
-                selectedValue={selectedWeek}
-                style={styles.picker}
-                onValueChange={value => setSelectedWeek(value)}>
-                <Picker.Item label="Chọn tuần" value={null} />
-                {weeks.map(w => (
-                  <Picker.Item key={w} label={`Tuần ${w}`} value={w} />
-                ))}
-              </Picker>
+              <Text style={[styles.pickerLabel, { color: themeColors.text }]}>Chọn tuần:</Text>
+              <View style={[styles.pickerContainer, { backgroundColor: theme === 'dark' ? '#333' : '#f5f5f5' }]}>
+                <Picker
+                  selectedValue={selectedWeek}
+                  style={[styles.picker, { color: themeColors.text }]}
+                  dropdownIconColor={themeColors.text}
+                  onValueChange={value => setSelectedWeek(value)}>
+                  <Picker.Item label="Chọn tuần" value={null} color={themeColors.text} />
+                  {weeks.map(w => (
+                    <Picker.Item key={w} label={`Tuần ${w}`} value={w} color={themeColors.text} />
+                  ))}
+                </Picker>
+              </View>
             </View>
           </>
         );
@@ -397,26 +408,32 @@ const StatisticalScreen = () => {
               alignItems: 'center',
             }}>
             <View style={{flex: 1, marginRight: 10}}>
-              <Text style={styles.pickerLabel}>Chọn tháng:</Text>
-              <Picker
-                selectedValue={selectedMonth}
-                style={styles.picker}
-                onValueChange={value => setSelectedMonth(value)}>
-                {months.map(m => (
-                  <Picker.Item key={m} label={`${m}`} value={m} />
-                ))}
-              </Picker>
+              <Text style={[styles.pickerLabel, { color: themeColors.text }]}>Chọn tháng:</Text>
+              <View style={[styles.pickerContainer, { backgroundColor: theme === 'dark' ? '#333' : '#f5f5f5' }]}>
+                <Picker
+                  selectedValue={selectedMonth}
+                  style={[styles.picker, { color: themeColors.text }]}
+                  dropdownIconColor={themeColors.text}
+                  onValueChange={value => setSelectedMonth(value)}>
+                  {months.map(m => (
+                    <Picker.Item key={m} label={`${m}`} value={m} color={themeColors.text} />
+                  ))}
+                </Picker>
+              </View>
             </View>
             <View style={{flex: 1}}>
-              <Text style={styles.pickerLabel}>Chọn năm:</Text>
-              <Picker
-                selectedValue={selectedYear}
-                style={styles.picker}
-                onValueChange={value => setSelectedYear(value)}>
-                {years.map(y => (
-                  <Picker.Item key={y} label={y.toString()} value={y} />
-                ))}
-              </Picker>
+              <Text style={[styles.pickerLabel, { color: themeColors.text }]}>Chọn năm:</Text>
+              <View style={[styles.pickerContainer, { backgroundColor: theme === 'dark' ? '#333' : '#f5f5f5' }]}>
+                <Picker
+                  selectedValue={selectedYear}
+                  style={[styles.picker, { color: themeColors.text }]}
+                  dropdownIconColor={themeColors.text}
+                  onValueChange={value => setSelectedYear(value)}>
+                  {years.map(y => (
+                    <Picker.Item key={y} label={y.toString()} value={y} color={themeColors.text} />
+                  ))}
+                </Picker>
+              </View>
             </View>
           </View>
         );
@@ -424,15 +441,18 @@ const StatisticalScreen = () => {
       case 'year':
         return (
           <View style={{marginBottom: 15}}>
-            <Text style={styles.pickerLabel}>Chọn năm:</Text>
-            <Picker
-              selectedValue={selectedYear}
-              style={styles.picker}
-              onValueChange={value => setSelectedYear(value)}>
-              {years.map(y => (
-                <Picker.Item key={y} label={y.toString()} value={y} />
-              ))}
-            </Picker>
+            <Text style={[styles.pickerLabel, { color: themeColors.text }]}>Chọn năm:</Text>
+            <View style={[styles.pickerContainer, { backgroundColor: theme === 'dark' ? '#333' : '#f5f5f5' }]}>
+              <Picker
+                selectedValue={selectedYear}
+                style={[styles.picker, { color: themeColors.text }]}
+                dropdownIconColor={themeColors.text}
+                onValueChange={value => setSelectedYear(value)}>
+                {years.map(y => (
+                  <Picker.Item key={y} label={y.toString()} value={y} color={themeColors.text} />
+                ))}
+              </Picker>
+            </View>
           </View>
         );
 
@@ -442,74 +462,87 @@ const StatisticalScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Thống kê chi tiêu</Text>
+        <Text style={[styles.headerText, { color: colors.text }]}>Thống kê chi tiêu</Text>
       </View>
 
-      <View style={styles.balanceContainer}>
-        <Text style={styles.balanceText}>
+      <View style={[styles.balanceContainer, { backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff' }]}>
+        <Text style={[styles.balanceText, { color: colors.text }]}>
           Số dư: {formatCurrency(walletBalance)}
         </Text>
-        <Text style={styles.balanceDetailText}>
+        <Text style={[styles.balanceDetailText, { color: colors.text }]}>
           Thu nhập: {formatCurrency(totalIncome)}
         </Text>
-        <Text style={styles.balanceDetailText}>
+        <Text style={[styles.balanceDetailText, { color: colors.text }]}>
           Chi tiêu: {formatCurrency(totalExpense)}
         </Text>
       </View>
 
-      <View style={styles.filterContainer}>
+      <View style={[styles.filterContainer, { backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff' }]}>
         <View>
-          <Text style={styles.label}>Ví:</Text>
-        <Picker
-          selectedValue={selectedWallet}
-          onValueChange={value => setSelectedWallet(value)}
-          style={styles.picker}>
-          <Picker.Item label="Tất cả" value="all" />
-          {wallets.map(wallet => (
-            <Picker.Item
-              key={wallet.id}
-              label={wallet.name}
-              value={wallet.id}
-            />
-          ))}
-        </Picker>
+          <Text style={[styles.label, { color: colors.text }]}>Ví:</Text>
+          <View style={[styles.pickerContainer, { backgroundColor: theme === 'dark' ? '#333' : '#f5f5f5' }]}>
+            <Picker
+              selectedValue={selectedWallet}
+              onValueChange={value => setSelectedWallet(value)}
+              style={[styles.picker, { color: colors.text }]}
+              dropdownIconColor={colors.text}>
+              <Picker.Item label="Tất cả" value="all" color={colors.text} />
+              {wallets.map(wallet => (
+                <Picker.Item
+                  key={wallet.id}
+                  label={wallet.name}
+                  value={wallet.id}
+                  color={colors.text}
+                />
+              ))}
+            </Picker>
+          </View>
+        </View>
 
-        <Text style={styles.label}>Thời gian:</Text>
-        <Picker
-          selectedValue={timeFilter}
-          onValueChange={value => setTimeFilter(value)}
-          style={styles.picker}>
-          <Picker.Item label="Tất cả" value="all" />
-          <Picker.Item label="Ngày" value="day" />
-          <Picker.Item label="Tuần" value="week" />
-          <Picker.Item label="Tháng" value="month" />
-          <Picker.Item label="Năm" value="year" />
-        </Picker>
+        <Text style={[styles.label, { color: colors.text }]}>Thời gian:</Text>
+        <View style={[styles.pickerContainer, { backgroundColor: theme === 'dark' ? '#333' : '#f5f5f5' }]}>
+          <Picker
+            selectedValue={timeFilter}
+            onValueChange={value => setTimeFilter(value)}
+            style={[styles.picker, { color: colors.text }]}
+            dropdownIconColor={colors.text}>
+            <Picker.Item label="Tất cả" value="all" color={colors.text} />
+            <Picker.Item label="Ngày" value="day" color={colors.text} />
+            <Picker.Item label="Tuần" value="week" color={colors.text} />
+            <Picker.Item label="Tháng" value="month" color={colors.text} />
+            <Picker.Item label="Năm" value="year" color={colors.text} />
+          </Picker>
         </View>
 
         {renderTimeDetailPicker()}
 
-        <Text style={styles.label}>Loại giao dịch:</Text>
-        <Picker
-          selectedValue={typeFilter}
-          onValueChange={value => setTypeFilter(value)}
-          style={styles.picker}>
-          <Picker.Item label="Cả hai (Thu nhập và Chi tiêu)" value="both" />
-          <Picker.Item label="Thu nhập" value="income" />
-          <Picker.Item label="Chi tiêu" value="expense" />
-        </Picker>
+        <Text style={[styles.label, { color: colors.text }]}>Loại giao dịch:</Text>
+        <View style={[styles.pickerContainer, { backgroundColor: theme === 'dark' ? '#333' : '#f5f5f5' }]}>
+          <Picker
+            selectedValue={typeFilter}
+            onValueChange={value => setTypeFilter(value)}
+            style={[styles.picker, { color: colors.text }]}
+            dropdownIconColor={colors.text}>
+            <Picker.Item label="Cả hai (Thu nhập và Chi tiêu)" value="both" color={colors.text} />
+            <Picker.Item label="Thu nhập" value="income" color={colors.text} />
+            <Picker.Item label="Chi tiêu" value="expense" color={colors.text} />
+          </Picker>
+        </View>
 
-        <Text style={styles.label}>Loại biểu đồ:</Text>
-        <Picker
-          selectedValue={chartType}
-          onValueChange={value => setChartType(value)}
-          style={styles.picker}>
-          <Picker.Item label="Cả hai" value="both" />
-          <Picker.Item label="Biểu đồ tròn" value="pie" />
-          <Picker.Item label="Biểu đồ đường" value="line" />
-        </Picker>
+        <Text style={[styles.label, { color: colors.text }]}>Loại biểu đồ:</Text>
+        <View style={[styles.pickerContainer, { backgroundColor: theme === 'dark' ? '#333' : '#f5f5f5' }]}>
+          <Picker
+            selectedValue={chartType}
+            onValueChange={value => setChartType(value)}
+            style={[styles.picker, { color: colors.text }]}
+            dropdownIconColor={colors.text}>
+            <Picker.Item label="Cả hai" value="both" color={colors.text} />
+            <Picker.Item label="Biểu đồ tròn" value="pie" color={colors.text} />
+            <Picker.Item label="Biểu đồ đường" value="line" color={colors.text} />
+          </Picker>
+        </View>
       </View>
 
       {loading ? (
@@ -518,8 +551,8 @@ const StatisticalScreen = () => {
         <>
           {(chartType === 'pie' || chartType === 'both') &&
             pieChartData.length > 0 && (
-              <View style={styles.chartContainer}>
-                <Text style={styles.chartTitle}>
+              <View style={[styles.chartContainer, { backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff' }]}>
+                <Text style={[styles.chartTitle, { color: colors.text }]}>
                   Phân bổ chi tiêu theo danh mục
                 </Text>
                 <PieChart
@@ -528,8 +561,8 @@ const StatisticalScreen = () => {
                   hasLegend={false}
                   height={220}
                   chartConfig={{
-                    backgroundGradientFrom: '#fff',
-                    backgroundGradientTo: '#fff',
+                    backgroundGradientFrom: theme === 'dark' ? '#2a2a2a' : '#fff',
+                    backgroundGradientTo: theme === 'dark' ? '#2a2a2a' : '#fff',
                     color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
                   }}
                   accessor="amount"
@@ -551,23 +584,23 @@ const StatisticalScreen = () => {
                 horizontal
                 style={{marginTop: 15}}
                 showsHorizontalScrollIndicator={false}>
-                <View style={styles.chartContainer}>
-                  {/* <Text style={styles.chartTitle}>
-                    Biểu đồ thu nhập - chi tiêu 7 ngày gần nhất
-                  </Text> */}
+                <View style={[styles.chartContainer, { backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff' }]}>
                   <LineChart
                     data={lineChartData}
                     width={Math.max(last7Days.length * 60, screenWidth - 20)}
                     height={256}
                     chartConfig={{
-                      backgroundGradientFrom: '#fff',
-                      backgroundGradientTo: '#fff',
-                      color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-                      labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                      backgroundGradientFrom: theme === 'dark' ? '#2a2a2a' : '#fff',
+                      backgroundGradientTo: theme === 'dark' ? '#2a2a2a' : '#fff',
+                      color: (opacity = 1) => `rgba(${theme === 'dark' ? '255, 255, 255' : '0, 0, 0'}, ${opacity})`,
+                      labelColor: (opacity = 1) => `rgba(${theme === 'dark' ? '255, 255, 255' : '0, 0, 0'}, ${opacity})`,
                       propsForDots: {
                         r: '4',
                         strokeWidth: '1',
-                        stroke: '#fff',
+                        stroke: theme === 'dark' ? '#2a2a2a' : '#fff',
+                      },
+                      propsForLabels: {
+                        fill: theme === 'dark' ? '#fff' : '#000',
                       },
                     }}
                     bezier
@@ -587,39 +620,36 @@ const StatisticalScreen = () => {
   );
 };
 
-export default StatisticalScreen;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: appColors.background,
+    backgroundColor: '#fafafa',
   },
   header: {
     padding: 16,
-    // backgroundColor: appColors.primary,
     alignItems: 'center',
   },
   headerText: {
     fontSize: 20,
-    // color: 'white',
   },
   filterContainer: {
     paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    margin: 16,
   },
   label: {
     fontSize: 16,
     marginTop: 12,
     marginBottom: 4,
-    color: appColors.textPrimary,
+  },
+  pickerContainer: {
+    borderRadius: 8,
+    marginBottom: 8,
+    overflow: 'hidden',
   },
   picker: {
-    backgroundColor: 'white',
-    borderRadius: 4,
-    ...Platform.select({
-      android: {
-        color: 'black',
-      },
-    }),
+    height: 50,
   },
   datePickerButton: {
     padding: 10,
@@ -633,7 +663,6 @@ const styles = StyleSheet.create({
   },
   balanceContainer: {
     padding: 16,
-    backgroundColor: 'white',
     marginHorizontal: 16,
     marginVertical: 12,
     borderRadius: 10,
@@ -642,17 +671,14 @@ const styles = StyleSheet.create({
   balanceText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: appColors.textPrimary,
   },
   balanceDetailText: {
     fontSize: 15,
     marginTop: 6,
-    color: appColors.textSecondary,
   },
   chartContainer: {
     marginHorizontal: 16,
     marginVertical: 12,
-    backgroundColor: 'white',
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 8,
@@ -663,7 +689,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
     marginBottom: 12,
-    color: appColors.textPrimary,
   },
   legendContainerColumn: {
     marginTop: 10,
@@ -688,25 +713,19 @@ const styles = StyleSheet.create({
   legendLabel: {
     flex: 1,
     fontSize: 14,
-    color: appColors.textPrimary,
   },
   legendAmount: {
     fontSize: 14,
-    color: appColors.textSecondary,
     fontWeight: '600',
   },
   legendDivider: {
-    // height: 1,
-    // backgroundColor: '#eee',
-    // flex: 1,
-    // marginLeft: 8,
     marginTop: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   pickerLabel: {
     fontSize: 14,
-    color: appColors.textPrimary,
     marginBottom: 4,
   },
 });
+
+export default StatisticalScreen;

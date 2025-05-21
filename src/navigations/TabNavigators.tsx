@@ -24,7 +24,7 @@ const TabNavigators = () => {
           backgroundColor: colors.tabBarBackground,
           borderTopColor: theme === 'dark' ? '#333' : '#ddd',
         },
-        tabBarActiveTintColor: colors.tabBarIcon,
+        tabBarActiveTintColor: '#2196F3',
         tabBarInactiveTintColor: theme === 'dark' ? '#666' : '#999',
       }}
     >

@@ -15,14 +15,88 @@ import firestore from '@react-native-firebase/firestore';
 import auth from '@react-native-firebase/auth';
 import {useFocusEffect} from '@react-navigation/native';
 import LoadingModal from '../../modals/LoadingModal';
+import { useTheme } from '../../constants/ThemeContext';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+
+const walletNameIcons: Record<string, string> = {
+  'mua sắm': 'tshirt-crew',
+  'đi lại': 'motorbike',
+  'ăn sáng': 'hamburger',
+  'ăn trưa': 'hamburger',
+  'ăn tối': 'hamburger',
+  'ăn chiều': 'hamburger',
+  'ăn nhẹ': 'hamburger',
+  'xe buýt': 'bus',
+  'taxi': 'car',
+  'xe máy': 'motorbike',
+  'ô tô': 'car',
+  'quần áo': 'tshirt-crew',
+  'giày dép': 'shoe-formal',
+  'mỹ phẩm': 'lipstick',
+  'sức khoẻ': 'medical-bag',
+  'khám bệnh': 'medical-bag',
+  'thuốc': 'pill',
+  'giải trí': 'gamepad-variant',
+  'xem phim': 'movie',
+  'ca nhạc': 'music',
+  'thể thao': 'badminton',
+  'bóng đá': 'soccer',
+  'cầu lông': 'badminton',
+  'bơi lội': 'swim',
+  'điện tử': 'cellphone',
+  'điện thoại': 'cellphone',
+  'laptop': 'laptop',
+  'máy tính bảng': 'tablet',
+  'giáo dục': 'book-open-page-variant',
+  'học phí': 'book-open-page-variant',
+  'sách vở': 'book',
+  'du lịch': 'airplane',
+  'khách sạn': 'bed',
+  'vé máy bay': 'airplane',
+  'thú cưng': 'dog',
+  'chó': 'dog',
+  'mèo': 'cat',
+  'lương': 'cash',
+  'tiết kiệm': 'piggy-bank',
+  'tiền lãi': 'bank',
+  'quà tặng': 'gift',
+  'y tế': 'hospital-box',
+  'gia đình': 'account-group',
+  'internet': 'wifi',
+  'điện nước': 'flash',
+  'cafe / trà sữa': 'coffee',
+  'sách / tài liệu': 'book',
+  'trang trí nhà': 'sofa',
+  'khác': 'dots-horizontal',
+};
+
+function getWalletIcon(name = '', iconProp: string | undefined) {
+  if (iconProp) return iconProp;
+  const key = name.trim().toLowerCase();
+  return walletNameIcons[key] || walletNameToIcon(name);
+}
+
+const walletNameToIcon = (name = '') => {
+  const lower = name.toLowerCase();
+  if (lower.includes('ngân hàng') || lower.includes('bank')) return 'bank';
+  if (lower.includes('thẻ') || lower.includes('card')) return 'credit-card';
+  if (lower.includes('momo')) return 'cellphone';
+  if (lower.includes('paypal')) return 'paypal';
+  if (lower.includes('tiết kiệm') || lower.includes('saving')) return 'piggy-bank';
+  if (lower.includes('tiền mặt') || lower.includes('cash')) return 'wallet';
+  if (lower.includes('zalo')) return 'chat';
+  if (lower.includes('đầu tư') || lower.includes('investment')) return 'finance';
+  return 'wallet';
+};
 
 const WalletScreen = () => {
+  const { colors, theme } = useTheme();
   const [walletName, setWalletName] = useState('');
   const [currency, setCurrency] = useState('VND');
   const [initialBalance, setInitialBalance] = useState('');
   const [loading, setLoading] = useState(false);
   const [wallets, setWallets] = useState<
-    {id: string; name: string; balance: number; currency: string}[]
+    {id: string; name: string; balance: number; currency: string; icon?: string}[]
   >([]);
   const [loadingWallets, setLoadingWallets] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -57,6 +131,7 @@ const WalletScreen = () => {
           name: data.name,
           balance: data.balance,
           currency: data.currency,
+          icon: data.icon,
         };
       });
       setWallets(walletList);
@@ -251,29 +326,44 @@ const WalletScreen = () => {
   const totalBalance = wallets.reduce((sum, w) => sum + (w.balance || 0), 0);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Tạo Ví</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.title, { color: colors.text }]}>Tạo Ví</Text>
 
-      <Text style={styles.label}>Tên ví</Text>
+      <Text style={[styles.label, { color: colors.text }]}>Tên ví</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, { 
+          backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
+          color: colors.text,
+          borderColor: theme === 'dark' ? '#444' : '#ccc'
+        }]}
         placeholder="Nhập tên ví"
+        placeholderTextColor={theme === 'dark' ? '#666' : '#999'}
         value={walletName}
         onChangeText={setWalletName}
       />
 
-      <Text style={styles.label}>Loại tiền tệ</Text>
+      <Text style={[styles.label, { color: colors.text }]}>Loại tiền tệ</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, { 
+          backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
+          color: colors.text,
+          borderColor: theme === 'dark' ? '#444' : '#ccc'
+        }]}
         placeholder="VD: VND, USD"
+        placeholderTextColor={theme === 'dark' ? '#666' : '#999'}
         value={currency}
         onChangeText={setCurrency}
       />
 
-      <Text style={styles.label}>Số dư ban đầu</Text>
+      <Text style={[styles.label, { color: colors.text }]}>Số dư ban đầu</Text>
       <TextInput
-        style={styles.input}
+        style={[styles.input, { 
+          backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
+          color: colors.text,
+          borderColor: theme === 'dark' ? '#444' : '#ccc'
+        }]}
         placeholder="Số tiền"
+        placeholderTextColor={theme === 'dark' ? '#666' : '#999'}
         value={initialBalance}
         keyboardType="numeric"
         onChangeText={text => {
@@ -294,28 +384,37 @@ const WalletScreen = () => {
         )}
       </TouchableOpacity>
 
-      <Text style={[styles.label, {marginTop: 30}]}>Tổng số dư của các ví</Text>
-      <Text style={styles.totalBalance}>
+      <Text style={[styles.label, { marginTop: 30, color: colors.text }]}>Tổng số dư của các ví</Text>
+      <Text style={[styles.totalBalance, { color: '#4CAF50' }]}>
         {totalBalance.toLocaleString('en-US')} {currency}
       </Text>
 
-      <Text style={[styles.label, {marginTop: 20}]}>Danh sách ví</Text>
+      <Text style={[styles.label, { marginTop: 20, color: colors.text }]}>Danh sách ví</Text>
 
       {loadingWallets ? (
         <ActivityIndicator size="large" color="#007AFF" />
       ) : (
         <ScrollView style={{maxHeight: 250}}>
           {wallets.length === 0 ? (
-            <Text>Chưa có ví nào.</Text>
+            <Text style={{ color: colors.text }}>Chưa có ví nào.</Text>
           ) : (
             wallets.map(wallet => (
               <TouchableOpacity
                 key={wallet.id}
                 onLongPress={() => onDeleteWallet(wallet.id)}
                 onPress={() => openEditModal(wallet)}
-                style={styles.walletItem}>
-                <Text style={styles.walletName}>{wallet.name}</Text>
-                <Text style={styles.walletBalance}>
+                style={[
+                  styles.walletItem,
+                  {
+                    marginBottom: 10,
+                    backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff',
+                  },
+                ]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Icon name={getWalletIcon(wallet.name, wallet.icon)} size={24} color={'#1976d2'} style={{ marginRight: 10 }} />
+                  <Text style={[styles.walletName, { color: colors.text }]}>{wallet.name}</Text>
+                </View>
+                <Text style={[styles.walletBalance, { color: colors.text }]}> 
                   {wallet.balance.toLocaleString('en-US')} {wallet.currency}
                 </Text>
               </TouchableOpacity>
@@ -412,8 +511,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 10,
-    borderBottomColor: '#eee',
-    borderBottomWidth: 1,
   },
   walletName: {
     fontSize: 16,

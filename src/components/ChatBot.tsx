@@ -15,7 +15,7 @@ interface Message {
 const SYSTEM_PROMPT = `
 Bạn là một trợ lý ảo quản lý chi tiêu cá nhân, thân thiện, dí dỏm, và luôn trả lời tự nhiên như một người bạn.
 Nếu người dùng yêu cầu tạo ví, thêm giao dịch, hoặc thống kê, hãy trả về một JSON hợp lệ, KHÔNG kèm bất kỳ văn bản nào khác, chỉ trả về JSON.
-Nếu không phải các thao tác trên, hãy trả lời bình thường.
+Nếu không phải các thao tác trên, hãy trả lời NGẮN GỌN (chỉ 1-2 câu), súc tích, thân thiện, dí dỏm, không dài dòng, không kể chuyện, không hỏi lại, không giải thích, không thêm lời khuyên, không dùng emoji quá nhiều.
 
 Cấu trúc JSON:
 - Tạo ví: { "action": "create_wallet", "name": "Tên ví", "currency": "VND", "balance": 0 }
@@ -27,7 +27,9 @@ Lưu ý:
 - Nếu hội thoại trước đã đề cập đến ví hoặc loại giao dịch, hãy tự động sử dụng thông tin đó, không hỏi lại người dùng.
 - Nếu thiếu thông tin, hãy cố gắng suy luận từ lịch sử hội thoại, chỉ hỏi lại khi thực sự không thể xác định.
 - Khi người dùng yêu cầu thêm khoản chi hoặc khoản thu mà không chỉ định ví, hãy dùng ví gần nhất hoặc ví vừa được nhắc đến trong hội thoại.
-- Khi trả lời người dùng (tạo ví, thêm giao dịch, thống kê, hoặc trả lời thông thường), hãy trả lời dí dỏm, vui vẻ, thân thiện, không quá cứng nhắc.
+- Nếu người dùng hỏi về các khoản chi, khoản thu, hoặc yêu cầu liệt kê, hãy trả về danh sách từng khoản chi/thu (danh mục, số tiền, ghi chú, ngày) trong khoảng thời gian tương ứng, không chỉ trả về tổng số tiền.
+- Nếu thiếu thông tin về ví hoặc thời gian, hãy tự động chọn ví gần nhất và thời gian là hôm nay, trừ khi hội thoại trước có nhắc đến.
+- Khi trả lời người dùng (tạo ví, thêm giao dịch, thống kê, hoặc trả lời thông thường), hãy trả lời dí dỏm, vui vẻ, thân thiện, NGẮN GỌN (chỉ 1-2 câu), không dài dòng, không kể chuyện, không hỏi lại, không giải thích, không thêm lời khuyên, không dùng emoji quá nhiều.
 `;
 
 const BOT_INTRO = 'Xin chào! Tôi là quản trị viên quản lý chi tiêu cá nhân của bạn!';
@@ -120,16 +122,14 @@ const ChatBot: React.FC = () => {
     loadChatHistory();
   }, [user]);
 
-  // Quét danh sách ví khi mở ChatBot
+  // Quét danh sách ví khi mở ChatBot (realtime)
   useEffect(() => {
     if (!user) return;
-    const fetchWallets = async () => {
-      try {
-        const snap = await firestore()
-          .collection('users')
-          .doc(user.uid)
-          .collection('wallets')
-          .get();
+    const unsubscribe = firestore()
+      .collection('users')
+      .doc(user.uid)
+      .collection('wallets')
+      .onSnapshot(snap => {
         const walletList = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
         setWallets(walletList);
         if (walletList.length > 0 && walletList[0].name) {
@@ -137,11 +137,8 @@ const ChatBot: React.FC = () => {
         } else {
           setLastWallet(null);
         }
-      } catch (e) {
-        setWallets([]);
-      }
-    };
-    fetchWallets();
+      });
+    return () => unsubscribe();
   }, [user]);
 
   // Save message to Firestore
@@ -326,6 +323,7 @@ const ChatBot: React.FC = () => {
         let type = json.type;
         let period = json.period;
         let now = new Date();
+        const items: any[] = [];
         for (const walletDoc of walletsSnap.docs) {
           const transSnap = await firestore()
             .collection('users')
@@ -342,26 +340,39 @@ const ChatBot: React.FC = () => {
               const d = data.createdAt?.toDate?.() || new Date(data.createdAt);
               if (d.toDateString() !== now.toDateString()) match = false;
             }
-            if (match) total += Number(data.amount);
+            if (match) {
+              total += Number(data.amount);
+              items.push({
+                category: data.category,
+                amount: data.amount,
+                note: data.note,
+                date: data.date,
+                type: data.type,
+                wallet: walletDoc.data().name
+              });
+            }
           }
         }
-        const replyText = generateNaturalReply('success_statistic', { type, period, total });
-        const prompt = buildConversationPrompt(messages, '', replyText);
+        // Gửi danh sách items cho Gemini để trả lời tự nhiên
+        const resultPrompt = `Hãy liệt kê các khoản ${type === 'income' ? 'thu nhập' : type === 'expense' ? 'chi tiêu' : 'giao dịch'} ${period === 'today' ? 'hôm nay' : period === 'week' ? 'tuần này' : period === 'month' ? 'tháng này' : ''} với dữ liệu sau: ${JSON.stringify(items)}. Trả lời NGẮN GỌN (chỉ 1-2 câu), súc tích, thân thiện, dí dỏm, không dài dòng, không kể chuyện, không hỏi lại, không giải thích, không thêm lời khuyên, không dùng emoji quá nhiều.`;
+        const prompt = buildConversationPrompt(messages, '', resultPrompt);
+        const aiReply = await chatWithGemini(prompt);
         const successMsg: Message = { 
           id: `bot_${Date.now()}`,
           sender: 'bot', 
-          text: replyText, 
+          text: aiReply, 
           timestamp: firestore.FieldValue.serverTimestamp() 
         };
         setMessages(prev => [...prev, successMsg]);
         await saveMessage(successMsg);
       } catch (e) {
-        const replyText = generateNaturalReply('fail_statistic', {});
-        const prompt = buildConversationPrompt(messages, '', replyText);
+        const resultPrompt = `Tôi vừa thực hiện thao tác thống kê nhưng bị lỗi. Hãy trả lời người dùng một cách thân thiện, tự nhiên, vui vẻ như một trợ lý AI.`;
+        const prompt = buildConversationPrompt(messages, '', resultPrompt);
+        const aiReply = await chatWithGemini(prompt);
         const errorMsg: Message = { 
           id: `bot_${Date.now()}`,
           sender: 'bot', 
-          text: replyText, 
+          text: aiReply, 
           timestamp: firestore.FieldValue.serverTimestamp() 
         };
         setMessages(prev => [...prev, errorMsg]);

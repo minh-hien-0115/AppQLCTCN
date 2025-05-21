@@ -19,8 +19,61 @@ import ChatBot from '../../components/ChatBot';
 
 const DEFAULT_AVATAR = 'https://i.pravatar.cc/150?img=3';
 
+const categoryIcons: Record<string, string> = {
+  'Ăn uống': 'hamburger',
+  'Ăn sáng': 'hamburger',
+  'Ăn trưa': 'hamburger',
+  'Ăn tối': 'hamburger',
+  'Ăn chiều': 'hamburger',
+  'Ăn nhẹ': 'hamburger',
+  'Đi lại': 'motorbike',
+  'Xe buýt': 'bus',
+  'Taxi': 'car',
+  'Xe máy': 'motorbike',
+  'Ô tô': 'car',
+  'Mua sắm': 'tshirt-crew',
+  'Quần áo': 'tshirt-crew',
+  'Giày dép': 'shoe-formal',
+  'Mỹ phẩm': 'lipstick',
+  'Sức khoẻ': 'medical-bag',
+  'Khám bệnh': 'medical-bag',
+  'Thuốc': 'pill',
+  'Giải trí': 'gamepad-variant',
+  'Xem phim': 'movie',
+  'Ca nhạc': 'music',
+  'Thể thao': 'badminton',
+  'Bóng đá': 'soccer',
+  'Cầu lông': 'badminton',
+  'Bơi lội': 'swim',
+  'Điện tử': 'cellphone',
+  'Điện thoại': 'cellphone',
+  'Laptop': 'laptop',
+  'Máy tính bảng': 'tablet',
+  'Giáo dục': 'book-open-page-variant',
+  'Học phí': 'book-open-page-variant',
+  'Sách vở': 'book',
+  'Du lịch': 'airplane',
+  'Khách sạn': 'bed',
+  'Vé máy bay': 'airplane',
+  'Thú cưng': 'dog',
+  'Chó': 'dog',
+  'Mèo': 'cat',
+  'Lương': 'cash',
+  'Tiết kiệm': 'piggy-bank',
+  'Tiền lãi': 'bank',
+  'Quà tặng': 'gift',
+  'Y tế': 'hospital-box',
+  'Gia đình': 'account-group',
+  'Internet': 'wifi',
+  'Điện nước': 'flash',
+  'Cafe / Trà sữa': 'coffee',
+  'Sách / Tài liệu': 'book',
+  'Trang trí nhà': 'sofa',
+  'Khác': 'dots-horizontal',
+};
+
 const HomeScreen = ({ navigation }: any) => {
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -177,6 +230,7 @@ const HomeScreen = ({ navigation }: any) => {
       styles.transactionItem,
       item.type === 'income' ? styles.transactionIncome : styles.transactionExpense
     ];
+    const iconName = categoryIcons[item.category] || 'wallet';
     return (
       <Pressable
         onPress={() => {
@@ -203,7 +257,7 @@ const HomeScreen = ({ navigation }: any) => {
         }}
         style={itemStyle}>
         <Icon
-          name={item.icon || 'wallet'}
+          name={iconName}
           size={26}
           color={color}
           style={{marginRight: 12}}
@@ -237,7 +291,10 @@ const HomeScreen = ({ navigation }: any) => {
                     setSelectedWallet(wallet);
                     setWalletModalVisible(false);
                   }}>
-                  <Text style={styles.walletName}>{wallet.name}</Text>
+                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                    <Icon name={wallet.icon || 'wallet'} size={20} color="#1976d2" style={{marginRight: 8}} />
+                    <Text style={styles.walletName}>{wallet.name}</Text>
+                  </View>
                   <Text>{formatCurrency(wallet.balance)}</Text>
                 </Pressable>
               ))}
@@ -249,56 +306,61 @@ const HomeScreen = ({ navigation }: any) => {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.welcomeRow}>
-        <Text style={styles.welcome}>Xin chào, {displayName}</Text>
+        <Text style={[styles.welcome, { color: colors.text }]}>Xin chào, {displayName}</Text>
         <AvatarComponents uri={avatarUri} />
       </View>
 
-      <View style={styles.summaryBox}>
+      <View style={[styles.summaryBox, { backgroundColor: theme === 'dark' ? '#1e1e1e' : '#fff' }]}>
         <View style={styles.headerRow}>
-          <Text style={styles.label}>
-            Số dư hiện tại của {selectedWallet?.name ?? 'Ví'}
-          </Text>
+          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            <Icon name={selectedWallet?.icon || 'wallet'} size={20} color={colors.text} style={{marginRight: 6}} />
+            <Text style={[styles.label, { color: colors.text }]}> 
+              Số dư hiện tại của {selectedWallet?.name ?? 'Ví'}
+            </Text>
+          </View>
           <TouchableOpacity onPress={() => setWalletModalVisible(true)}>
-            <Icon name="dots-vertical" size={22} color="#555" />
+            <Icon name="dots-vertical" size={22} color={colors.text} />
           </TouchableOpacity>
         </View>
-        <Text style={styles.balance}>
+        <Text style={[styles.balance, { color: colors.text }]}>
           {selectedWallet
             ? formatCurrency(selectedWallet.balance)
             : formatCurrency(0)}
         </Text>
 
         <View style={styles.row}>
-          <View style={styles.box}>
+          <View style={[styles.box, { backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f5f5f5', borderColor: '#4caf50' }]}> 
             <View style={styles.incomeRow}>
-              <Text style={styles.incomeLabel}>Thu nhập</Text>
+              <Icon name="cash" size={22} color="#4caf50" style={{marginRight: 6}} />
+              <Text style={[styles.incomeLabel, { color: colors.text }]}>Thu nhập</Text>
               <Icon
                 name="arrow-up-bold"
-                size={18}
+                size={22}
                 color="#4caf50"
-                style={{marginLeft: 6}}
+                style={{marginLeft: 8}}
               />
             </View>
-            <Text style={styles.income}>{formatCurrency(totalIncome)}</Text>
+            <Text style={[styles.income, { color: '#4caf50' }]}>{formatCurrency(totalIncome)}</Text>
           </View>
-          <View style={styles.box}>
+          <View style={[styles.box, { backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f5f5f5', borderColor: '#f44336' }]}> 
             <View style={styles.expenseRow}>
-              <Text style={styles.expenseLabel}>Chi tiêu</Text>
+              <Icon name="cash-remove" size={22} color="#f44336" style={{marginRight: 6}} />
+              <Text style={[styles.expenseLabel, { color: colors.text }]}>Chi tiêu</Text>
               <Icon
                 name="arrow-down-bold"
-                size={18}
+                size={22}
                 color="#f44336"
-                style={{marginLeft: 6}}
+                style={{marginLeft: 8}}
               />
             </View>
-            <Text style={styles.expense}>{formatCurrency(totalExpense)}</Text>
+            <Text style={[styles.expense, { color: '#f44336' }]}>{formatCurrency(totalExpense)}</Text>
           </View>
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Giao dịch gần đây</Text>
+      <Text style={[styles.sectionTitle, { color: colors.text }]}>Giao dịch gần đây</Text>
 
       {loading ? (
         <ActivityIndicator size="large" color="#1e90ff" />
@@ -342,7 +404,10 @@ const HomeScreen = ({ navigation }: any) => {
                     setSelectedWallet(wallet);
                     setWalletModalVisible(false);
                   }}>
-                  <Text style={styles.walletName}>{wallet.name}</Text>
+                  <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                    <Icon name={wallet.icon || 'wallet'} size={20} color="#1976d2" style={{marginRight: 8}} />
+                    <Text style={styles.walletName}>{wallet.name}</Text>
+                  </View>
                   <Text>{formatCurrency(wallet.balance)}</Text>
                 </Pressable>
               ))
@@ -368,8 +433,15 @@ const HomeScreen = ({ navigation }: any) => {
             </View>
             {selectedTransaction ? (
               <View style={{paddingHorizontal: 10}}>
-                <Text style={{fontWeight: '600', fontSize: 16, marginBottom: 8}}>
-                  Danh mục: {selectedTransaction.category}
+                <Text style={{fontWeight: '600', fontSize: 16, marginBottom: 8, flexDirection: 'row', alignItems: 'center', display: 'flex'}}>
+                  Danh mục: 
+                  <Icon
+                    name={categoryIcons[selectedTransaction.category] || 'wallet'}
+                    size={20}
+                    color={'#1976d2'}
+                    style={{marginRight: 6, marginLeft: 4, top: 2}}
+                  />
+                  {selectedTransaction.category}
                 </Text>
                 <Text style={{marginBottom: 6}}>
                   Số tiền:{' '}
@@ -404,7 +476,7 @@ const HomeScreen = ({ navigation }: any) => {
 
       {/* Nút chat nổi */}
       <TouchableOpacity style={styles.chatIcon} onPress={() => setIsChatOpen(true)}>
-        <Icon name="robot-outline" size={28} color="#000" />
+        <Icon name="robot-outline" size={28} color="#1976d2" />
       </TouchableOpacity>
       {isChatOpen && (
         <View style={styles.floatingChatBox}>
@@ -453,29 +525,37 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginVertical: 8,
     color: '#333',
+    textAlign: 'center',
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   box: {
     width: '48%',
+    marginHorizontal: 6,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
   },
   incomeLabel: {
-    fontSize: 14,
+    fontSize: 17,
     color: '#4caf50',
   },
   income: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '600',
     color: '#4caf50',
   },
   expenseLabel: {
-    fontSize: 14,
+    fontSize: 17,
     color: '#f44336',
   },
   expense: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '600',
     color: '#f44336',
   },
@@ -571,6 +651,8 @@ const styles = StyleSheet.create({
     padding: 12,
     elevation: 5,
     zIndex: 100,
+    borderWidth: 2,
+    borderColor: '#1976d2',
   },
   floatingChatBox: {
     position: 'absolute',
