@@ -12,7 +12,10 @@ interface Message {
   timestamp: FirebaseFirestoreTypes.FieldValue | Date;
 }
 
-const SYSTEM_PROMPT = `Bạn là một trợ lý ảo quản trị viên quản lý chi tiêu cá nhân. Nếu người dùng yêu cầu tạo ví, thêm giao dịch, hoặc thống kê, hãy trả về một JSON hợp lệ, KHÔNG kèm bất kỳ văn bản nào khác, chỉ trả về JSON. Nếu không phải các thao tác trên, hãy trả lời bình thường.
+const SYSTEM_PROMPT = `
+Bạn là một trợ lý ảo quản lý chi tiêu cá nhân, thân thiện, dí dỏm, và luôn trả lời tự nhiên như một người bạn.
+Nếu người dùng yêu cầu tạo ví, thêm giao dịch, hoặc thống kê, hãy trả về một JSON hợp lệ, KHÔNG kèm bất kỳ văn bản nào khác, chỉ trả về JSON.
+Nếu không phải các thao tác trên, hãy trả lời bình thường.
 
 Cấu trúc JSON:
 - Tạo ví: { "action": "create_wallet", "name": "Tên ví", "currency": "VND", "balance": 0 }
@@ -21,18 +24,47 @@ Cấu trúc JSON:
 - Thống kê: { "action": "statistic", "type": "expense|income|all", "period": "today|week|month" }
 
 Lưu ý:
-- Nếu người dùng chat kiểu tự nhiên như 'chi 30k ăn sáng', hãy tự động nhận diện số tiền, tên khoản chi, ghi chú... và tạo JSON add_transaction đúng cấu trúc như trên, ví là ví gần nhất.
-- Khi tạo ví xong, chỉ trả về thông báo đã tạo ví và tên ví, không kèm JSON.
-- Khi thêm giao dịch thành công, chỉ trả về thông báo số tiền, tên khoản chi, và tên ví, không kèm JSON.
-- Khi trả lời người dùng (tạo ví, thêm giao dịch, thống kê, hoặc trả lời thông thường), hãy trả lời dí dỏm, vui vẻ, thân thiện, không quá cứng nhắc.`;
+- Nếu người dùng yêu cầu tạo ví mà không chỉ định tên, bạn hãy tự nghĩ ra một tên ví phù hợp (ví dụ: 'Ví Siêu Tiết Kiệm', 'Ví Mục Tiêu', 'Ví Học Tập'...), thông báo lại tên ví bạn đã chọn cho người dùng, và trả về JSON đúng cấu trúc với tên đó.
+- Khi trả lời người dùng (tạo ví, thêm giao dịch, thống kê, hoặc trả lời thông thường), hãy trả lời dí dỏm, vui vẻ, thân thiện, không quá cứng nhắc.
+`;
 
 const BOT_INTRO = 'Xin chào! Tôi là quản trị viên quản lý chi tiêu cá nhân của bạn!';
+
+// Hàm sinh câu trả lời tự nhiên, thân thiện
+function generateNaturalReply(type: string, data: any): string {
+  switch (type) {
+    case 'success_create_wallet':
+      return `🎉 Ví '${data.name}' đã được tạo thành công! Chúc bạn quản lý chi tiêu thật tốt nhé!`;
+    case 'fail_create_wallet':
+      return `😢 Xin lỗi, không thể tạo ví mới lúc này. Bạn thử lại sau nhé!`;
+    case 'success_add_transaction':
+      return `Đã ghi nhận giao dịch ${data.amount.toLocaleString()} cho ${data.category} vào ví '${data.wallet}'. Bạn nhớ kiểm soát chi tiêu nhé!`;
+    case 'fail_add_transaction':
+      return `Không thể thêm giao dịch. Bạn kiểm tra lại thông tin hoặc thử lại sau nhé!`;
+    case 'success_statistic':
+      return `Tổng ${data.type === 'income' ? 'thu nhập' : data.type === 'expense' ? 'chi tiêu' : 'giao dịch'} ${data.period === 'today' ? 'hôm nay' : data.period === 'week' ? 'tuần này' : data.period === 'month' ? 'tháng này' : ''}: ${data.total.toLocaleString()} đ. Cố gắng tiết kiệm hơn nhé!`;
+    case 'fail_statistic':
+      return `Không thể thống kê lúc này. Bạn thử lại sau nhé!`;
+    default:
+      return 'Thao tác thành công!';
+  }
+}
+
+// Hàm build prompt hội thoại với lịch sử 50 câu gần nhất
+function buildConversationPrompt(messages: Message[], systemPrompt: string, userMsg: string) {
+  let history = messages
+    .slice(-50)
+    .map(m => (m.sender === 'user' ? `Người dùng: ${m.text}` : `Bot: ${m.text}`))
+    .join('\n');
+  return `${systemPrompt}\n\nLịch sử hội thoại:\n${history}\nNgười dùng: ${userMsg}`;
+}
 
 const ChatBot: React.FC = () => {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastWallet, setLastWallet] = useState<string | null>(null);
+  const [wallets, setWallets] = useState<any[]>([]);
   const flatListRef = useRef<FlatList>(null);
   const user = auth().currentUser;
 
@@ -86,6 +118,30 @@ const ChatBot: React.FC = () => {
     loadChatHistory();
   }, [user]);
 
+  // Quét danh sách ví khi mở ChatBot
+  useEffect(() => {
+    if (!user) return;
+    const fetchWallets = async () => {
+      try {
+        const snap = await firestore()
+          .collection('users')
+          .doc(user.uid)
+          .collection('wallets')
+          .get();
+        const walletList = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+        setWallets(walletList);
+        if (walletList.length > 0 && walletList[0].name) {
+          setLastWallet(walletList[0].name);
+        } else {
+          setLastWallet(null);
+        }
+      } catch (e) {
+        setWallets([]);
+      }
+    };
+    fetchWallets();
+  }, [user]);
+
   // Save message to Firestore
   const saveMessage = async (message: Message) => {
     if (!user) return;
@@ -132,19 +188,26 @@ const ChatBot: React.FC = () => {
           createdAt: firestore.FieldValue.serverTimestamp(),
         });
         setLastWallet(json.name);
+        // Gửi prompt cho Gemini để trả lời tự nhiên
+        const resultPrompt = `Tôi vừa tạo ví thành công với tên '${json.name}'. Hãy trả lời người dùng một cách thân thiện, tự nhiên, vui vẻ như một trợ lý AI.`;
+        const prompt = buildConversationPrompt(messages, '', resultPrompt);
+        const aiReply = await chatWithGemini(prompt);
         const successMsg: Message = { 
           id: `bot_${Date.now()}`,
           sender: 'bot', 
-          text: `Đã tạo ví mới: ${json.name}`, 
+          text: aiReply, 
           timestamp: firestore.FieldValue.serverTimestamp() 
         };
         setMessages(prev => [...prev, successMsg]);
         await saveMessage(successMsg);
       } catch (e) {
+        const resultPrompt = `Tôi vừa thực hiện thao tác tạo ví nhưng bị lỗi. Hãy trả lời người dùng một cách thân thiện, tự nhiên, vui vẻ như một trợ lý AI.`;
+        const prompt = buildConversationPrompt(messages, '', resultPrompt);
+        const aiReply = await chatWithGemini(prompt);
         const errorMsg: Message = { 
           id: `bot_${Date.now()}`,
           sender: 'bot', 
-          text: 'Không thể tạo ví mới.', 
+          text: aiReply, 
           timestamp: firestore.FieldValue.serverTimestamp() 
         };
         setMessages(prev => [...prev, errorMsg]);
@@ -225,19 +288,26 @@ const ChatBot: React.FC = () => {
           .doc(walletId)
           .update({ balance: newBalance });
         setLastWallet(walletName);
+        // Gửi prompt cho Gemini để trả lời tự nhiên
+        const resultPrompt = `Tôi vừa thêm giao dịch thành công: ${type === 'income' ? 'thu nhập' : 'chi tiêu'} ${amount.toLocaleString()} cho ${json.category} vào ví '${walletName}'. Hãy trả lời người dùng một cách thân thiện, tự nhiên, vui vẻ như một trợ lý AI.`;
+        const prompt = buildConversationPrompt(messages, '', resultPrompt);
+        const aiReply = await chatWithGemini(prompt);
         const successMsg: Message = { 
           id: `bot_${Date.now()}`,
           sender: 'bot', 
-          text: `Đã ghi nhận chi tiêu ${amount.toLocaleString()} cho ${json.category} vào ví ${walletName}`, 
+          text: aiReply, 
           timestamp: firestore.FieldValue.serverTimestamp() 
         };
         setMessages(prev => [...prev, successMsg]);
         await saveMessage(successMsg);
       } catch (e) {
+        const resultPrompt = `Tôi vừa thực hiện thao tác thêm giao dịch nhưng bị lỗi. Hãy trả lời người dùng một cách thân thiện, tự nhiên, vui vẻ như một trợ lý AI.`;
+        const prompt = buildConversationPrompt(messages, '', resultPrompt);
+        const aiReply = await chatWithGemini(prompt);
         const errorMsg: Message = { 
           id: `bot_${Date.now()}`,
           sender: 'bot', 
-          text: 'Không thể thêm giao dịch.', 
+          text: aiReply, 
           timestamp: firestore.FieldValue.serverTimestamp() 
         };
         setMessages(prev => [...prev, errorMsg]);
@@ -273,19 +343,23 @@ const ChatBot: React.FC = () => {
             if (match) total += Number(data.amount);
           }
         }
+        const replyText = generateNaturalReply('success_statistic', { type, period, total });
+        const prompt = buildConversationPrompt(messages, '', replyText);
         const successMsg: Message = { 
           id: `bot_${Date.now()}`,
           sender: 'bot', 
-          text: `Tổng ${type === 'income' ? 'thu nhập' : type === 'expense' ? 'chi tiêu' : 'giao dịch'} ${period === 'today' ? 'hôm nay' : ''}: ${total.toLocaleString()} đ`, 
+          text: replyText, 
           timestamp: firestore.FieldValue.serverTimestamp() 
         };
         setMessages(prev => [...prev, successMsg]);
         await saveMessage(successMsg);
       } catch (e) {
+        const replyText = generateNaturalReply('fail_statistic', {});
+        const prompt = buildConversationPrompt(messages, '', replyText);
         const errorMsg: Message = { 
           id: `bot_${Date.now()}`,
           sender: 'bot', 
-          text: 'Không thể thống kê.', 
+          text: replyText, 
           timestamp: firestore.FieldValue.serverTimestamp() 
         };
         setMessages(prev => [...prev, errorMsg]);
@@ -319,14 +393,14 @@ const ChatBot: React.FC = () => {
     setLoading(true);
 
     try {
-      const reply = await chatWithGemini(`${SYSTEM_PROMPT}\n\nCâu hỏi của người dùng: ${userMsg.text}`);
+      const prompt = buildConversationPrompt([...messages, userMsg], SYSTEM_PROMPT, userMsg.text);
+      const reply = await chatWithGemini(prompt);
       let jsonStr = reply;
       const codeBlockMatch = reply.match(/```json([\s\S]*?)```|```([\s\S]*?)```/);
       if (codeBlockMatch) {
         jsonStr = codeBlockMatch[1] || codeBlockMatch[2] || '';
       }
       jsonStr = jsonStr.trim().replace(/^([^{]*)/, '').replace(/([^}]*)$/, '');
-      
       let parsed;
       try {
         parsed = JSON.parse(jsonStr);
@@ -334,22 +408,33 @@ const ChatBot: React.FC = () => {
         parsed = null;
       }
 
+      // Nếu là thống kê nhưng không parse được JSON, vẫn hiển thị text trả về
       if (parsed && parsed.action) {
         await handleBotCommand(parsed);
       } else {
-        if (jsonStr.includes('{') && jsonStr.includes('}')) {
-          const errorMsg: Message = { 
+        // Nếu người dùng hỏi về thống kê nhưng Gemini trả về text thường
+        if (/thống kê|tổng thu|tổng chi|bao nhiêu|chi tiêu|thu nhập/i.test(userMsg.text)) {
+          const botMsg: Message = {
             id: `bot_${Date.now()}`,
-            sender: 'bot', 
+            sender: 'bot',
+            text: reply,
+            timestamp: firestore.FieldValue.serverTimestamp()
+          };
+          setMessages(prev => [...prev, botMsg]);
+          await saveMessage(botMsg);
+        } else if (jsonStr.includes('{') && jsonStr.includes('}')) {
+          const errorMsg: Message = {
+            id: `bot_${Date.now()}`,
+            sender: 'bot',
             text: 'Xin lỗi, tôi chưa hiểu yêu cầu hoặc thao tác này. Bạn có thể thử lại hoặc nói rõ hơn nhé!',
             timestamp: firestore.FieldValue.serverTimestamp()
           };
           setMessages(prev => [...prev, errorMsg]);
           await saveMessage(errorMsg);
         } else {
-          const botMsg: Message = { 
+          const botMsg: Message = {
             id: `bot_${Date.now()}`,
-            sender: 'bot', 
+            sender: 'bot',
             text: reply,
             timestamp: firestore.FieldValue.serverTimestamp()
           };
@@ -358,9 +443,9 @@ const ChatBot: React.FC = () => {
         }
       }
     } catch {
-      const errorMsg: Message = { 
+      const errorMsg: Message = {
         id: `bot_${Date.now()}`,
-        sender: 'bot', 
+        sender: 'bot',
         text: 'Có lỗi xảy ra khi gọi API.',
         timestamp: firestore.FieldValue.serverTimestamp()
       };

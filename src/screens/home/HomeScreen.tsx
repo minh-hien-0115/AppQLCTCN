@@ -173,7 +173,10 @@ const HomeScreen = ({ navigation }: any) => {
 
   const renderTransaction = ({item}: {item: any}) => {
     const color = item.type === 'income' ? '#4caf50' : '#f44336';
-
+    const itemStyle = [
+      styles.transactionItem,
+      item.type === 'income' ? styles.transactionIncome : styles.transactionExpense
+    ];
     return (
       <Pressable
         onPress={() => {
@@ -198,7 +201,7 @@ const HomeScreen = ({ navigation }: any) => {
             { cancelable: true }
           );
         }}
-        style={styles.transactionItem}>
+        style={itemStyle}>
         <Icon
           name={item.icon || 'wallet'}
           size={26}
@@ -433,7 +436,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 16,
     marginBottom: 20,
-    elevation: 2,
+    borderWidth: 2,
+    borderColor: '#1976d2',
   },
   headerRow: {
     flexDirection: 'row',
@@ -484,11 +488,19 @@ const styles = StyleSheet.create({
   transactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     borderRadius: 8,
     padding: 12,
     marginBottom: 10,
     elevation: 1,
+    borderWidth: 2,
+  },
+  transactionIncome: {
+    backgroundColor: '#e8f5e9',
+    borderColor: '#4caf50',
+  },
+  transactionExpense: {
+    backgroundColor: '#ffebee',
+    borderColor: '#f44336',
   },
   category: {
     fontSize: 16,
