@@ -20,11 +20,13 @@ Nếu không phải các thao tác trên, hãy trả lời bình thường.
 Cấu trúc JSON:
 - Tạo ví: { "action": "create_wallet", "name": "Tên ví", "currency": "VND", "balance": 0 }
 - Thêm giao dịch: { "action": "add_transaction", "wallet": "Tên ví", "type": "income|expense", "amount": số tiền, "category": "Tên khoản chi", "note": "Ghi chú", "date": "yyyy-MM-dd" }
-- Nếu người dùng không chỉ định ví, hãy dùng ví gần nhất. Nếu không có ví nào, yêu cầu tạo ví trước.
+- Nếu người dùng không chỉ định ví, hãy dùng ví gần nhất hoặc ví vừa được nhắc đến trong hội thoại. Nếu không có ví nào, yêu cầu tạo ví trước.
 - Thống kê: { "action": "statistic", "type": "expense|income|all", "period": "today|week|month" }
 
 Lưu ý:
-- Nếu người dùng yêu cầu tạo ví mà không chỉ định tên, bạn hãy tự nghĩ ra một tên ví phù hợp (ví dụ: 'Ví Siêu Tiết Kiệm', 'Ví Mục Tiêu', 'Ví Học Tập'...), thông báo lại tên ví bạn đã chọn cho người dùng, và trả về JSON đúng cấu trúc với tên đó.
+- Nếu hội thoại trước đã đề cập đến ví hoặc loại giao dịch, hãy tự động sử dụng thông tin đó, không hỏi lại người dùng.
+- Nếu thiếu thông tin, hãy cố gắng suy luận từ lịch sử hội thoại, chỉ hỏi lại khi thực sự không thể xác định.
+- Khi người dùng yêu cầu thêm khoản chi hoặc khoản thu mà không chỉ định ví, hãy dùng ví gần nhất hoặc ví vừa được nhắc đến trong hội thoại.
 - Khi trả lời người dùng (tạo ví, thêm giao dịch, thống kê, hoặc trả lời thông thường), hãy trả lời dí dỏm, vui vẻ, thân thiện, không quá cứng nhắc.
 `;
 
