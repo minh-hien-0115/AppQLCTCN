@@ -15,10 +15,11 @@ import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { AvatarComponents } from '../../components';
 import { useTheme } from '../../constants/ThemeContext';
+import ChatBot from '../../components/ChatBot';
 
 const DEFAULT_AVATAR = 'https://i.pravatar.cc/150?img=3';
 
-const HomeScreen = () => {
+const HomeScreen = ({ navigation }: any) => {
   const { colors } = useTheme();
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
@@ -29,6 +30,7 @@ const HomeScreen = () => {
   const [avatarUri, setAvatarUri] = useState<string>(DEFAULT_AVATAR);
   const [transactionDetailModalVisible, setTransactionDetailModalVisible] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const userId = auth().currentUser?.uid;
 
@@ -396,6 +398,19 @@ const HomeScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Nút chat nổi */}
+      <TouchableOpacity style={styles.chatIcon} onPress={() => setIsChatOpen(true)}>
+        <Icon name="robot-outline" size={28} color="#000" />
+      </TouchableOpacity>
+      {isChatOpen && (
+        <View style={styles.floatingChatBox}>
+          <TouchableOpacity style={styles.closeBtn} onPress={() => setIsChatOpen(false)}>
+            <Icon name="close" size={22} color="#333" />
+          </TouchableOpacity>
+          <ChatBot />
+        </View>
+      )}
     </View>
   );
 };
@@ -534,5 +549,53 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginVertical: 12,
+  },
+  chatIcon: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: '#fff',
+    borderRadius: 30,
+    padding: 12,
+    elevation: 5,
+    zIndex: 100,
+  },
+  floatingChatBox: {
+    position: 'absolute',
+    bottom: 20,
+    right: '1%',
+    width: '98%',
+    height: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 28,
+    elevation: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    padding: 10,
+    zIndex: 200,
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 10,
+    backgroundColor: '#eee',
+    borderRadius: 16,
+    padding: 4,
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#1976d2',
+  },
+  sendButtonDisabled: {
+    borderColor: '#ccc',
   },
 });
