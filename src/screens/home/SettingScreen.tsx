@@ -219,8 +219,8 @@ const SettingScreen = ({navigation}: any) => {
       {/* Đăng xuất */}
       <TouchableOpacity style={styles.settingItem} onPress={handleLogout}>
         <View style={styles.settingLeft}>
-          <Feather name="log-out" size={22} />
-          <Text style={[styles.settingText]}>Đăng xuất</Text>
+          <Feather name="log-out" size={22} color="red" />
+          <Text style={[styles.settingText, { color: 'red' }]}>Đăng xuất</Text>
         </View>
         <Feather name="chevron-right" size={24} color={colors.tabBarIcon} />
       </TouchableOpacity>

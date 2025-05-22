@@ -17,6 +17,7 @@ import {
   View,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useTheme } from '../../constants/ThemeContext';
 
 const incomeCategories = [
   { name: 'Lương', icon: 'cash' },
@@ -78,6 +79,7 @@ const recurrenceOptions = [
 ];
 
 const AddScreen = () => {
+  const { colors, theme } = useTheme();
   const [wallets, setWallets] = useState<{ id: string; name: string; icon?: string; balance?: number }[]>([]);
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
   const [modalWalletVisible, setModalWalletVisible] = useState(false);
@@ -250,45 +252,67 @@ const AddScreen = () => {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.select({ios: 'padding', android: undefined})}>
       <ScrollView keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Thêm giao dịch</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Thêm giao dịch</Text>
 
         {/* --- Chọn ví --- */}
         <TouchableOpacity
-          style={[styles.input, styles.dropdown]}
+          style={[
+            styles.input,
+            styles.dropdown,
+            { 
+              backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f9f9f9',
+              borderColor: theme === 'dark' ? '#444' : '#ddd'
+            }
+          ]}
           onPress={() => setModalWalletVisible(true)}>
-          <Text>
+          <Text style={{ color: colors.text }}>
             {' '}
             {selectedWalletId
               ? wallets.find(w => w.id === selectedWalletId)?.name
               : 'Chọn ví'}
           </Text>
-          <ArrowDown2 size={20} color="#555" />
+          <ArrowDown2 size={20} color={colors.text} />
         </TouchableOpacity>
 
         {/* --- Chọn danh mục --- */}
         <TouchableOpacity
-          style={[styles.input, styles.dropdown]}
+          style={[
+            styles.input,
+            styles.dropdown,
+            { 
+              backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f9f9f9',
+              borderColor: theme === 'dark' ? '#444' : '#ddd'
+            }
+          ]}
           onPress={() => setModalVisible(true)}>
           <View style={{flexDirection: 'row', alignItems: 'center'}}>
             {icon ? (
               <Icon
                 name={icon}
                 size={20}
-                color="#555"
+                color={colors.text}
                 style={{marginRight: 8}}
               />
             ) : null}
-            <Text>{category || 'Chọn danh mục'}</Text>
+            <Text style={{ color: colors.text }}>{category || 'Chọn danh mục'}</Text>
           </View>
-          <ArrowDown2 size={20} color="#555" />
+          <ArrowDown2 size={20} color={colors.text} />
         </TouchableOpacity>
 
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            { 
+              backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f9f9f9',
+              color: colors.text,
+              borderColor: theme === 'dark' ? '#444' : '#ddd'
+            }
+          ]}
           placeholder="Số tiền"
+          placeholderTextColor={theme === 'dark' ? '#666' : '#999'}
           keyboardType="numeric"
           value={amount}
           onChangeText={text => {
@@ -299,43 +323,73 @@ const AddScreen = () => {
         />
 
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            { 
+              backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f9f9f9',
+              color: colors.text,
+              borderColor: theme === 'dark' ? '#444' : '#ddd'
+            }
+          ]}
           placeholder="Ghi chú (tùy chọn)"
+          placeholderTextColor={theme === 'dark' ? '#666' : '#999'}
           value={note}
           onChangeText={setNote}
         />
 
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            { 
+              backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f9f9f9',
+              color: colors.text,
+              borderColor: theme === 'dark' ? '#444' : '#ddd'
+            }
+          ]}
           placeholder="Thêm thẻ (tags), cách nhau bằng dấu phẩy"
+          placeholderTextColor={theme === 'dark' ? '#666' : '#999'}
           value={tags}
           onChangeText={setTags}
         />
 
         <TouchableOpacity
-          style={[styles.input, styles.dropdown]}
+          style={[
+            styles.input,
+            styles.dropdown,
+            { 
+              backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f9f9f9',
+              borderColor: theme === 'dark' ? '#444' : '#ddd'
+            }
+          ]}
           onPress={() => setModalRecurrenceVisible(true)}>
-          <Text>
+          <Text style={{ color: colors.text }}>
             Tùy chọn lặp lại: {
               recurrenceOptions.find(o => o.value === recurrence)?.label || ''
             }
           </Text>
-          <ArrowDown2 size={20} color="#555" />
+          <ArrowDown2 size={20} color={colors.text} />
         </TouchableOpacity>
 
         {recurrence === 'monthly' && (
           <TouchableOpacity
-            style={[styles.input, styles.dropdown]}
+            style={[
+              styles.input,
+              styles.dropdown,
+              { 
+                backgroundColor: theme === 'dark' ? '#2a2a2a' : '#f9f9f9',
+                borderColor: theme === 'dark' ? '#444' : '#ddd'
+              }
+            ]}
             onPress={() => setModalRecurrenceDayVisible(true)}>
-            <Text>
+            <Text style={{ color: colors.text }}>
               Ngày trong tháng: {recurrenceDay ? recurrenceDay : 'Chọn ngày'}
             </Text>
-            <ArrowDown2 size={20} color="#555" />
+            <ArrowDown2 size={20} color={colors.text} />
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity style={styles.button} onPress={onSave}>
-          <Text style={styles.buttonText}>Lưu</Text>
+        <TouchableOpacity style={[styles.button, { backgroundColor: '#2196F3' }]} onPress={onSave}>
+          <Text style={[styles.buttonText, { color: '#fff' }]}>Lưu</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -346,12 +400,12 @@ const AddScreen = () => {
         animationType="fade"
         onRequestClose={() => setModalWalletVisible(false)}>
         <Pressable
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
           onPress={() => setModalWalletVisible(false)}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Chọn ví</Text>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Chọn ví</Text>
             {wallets.length === 0 ? (
-              <Text style={{textAlign: 'center', marginVertical: 10}}>
+              <Text style={[styles.walletItemText, { color: colors.text }]}>
                 Không có ví nào. Vui lòng tạo ví trước.
               </Text>
             ) : (
@@ -363,16 +417,16 @@ const AddScreen = () => {
                     style={[
                       styles.walletItem,
                       selectedWalletId === item.id && styles.walletItemSelected,
+                      { backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff' }
                     ]}
                     onPress={() => {
                       setSelectedWalletId(item.id);
                       setModalWalletVisible(false);
                     }}>
-                    <Text
-                      style={[
-                        styles.walletItemText,
-                        selectedWalletId === item.id && {color: '#fff'},
-                      ]}>
+                    <Text style={[
+                      styles.walletItemText,
+                      { color: selectedWalletId === item.id ? '#fff' : colors.text }
+                    ]}>
                       {item.name}
                     </Text>
                   </TouchableOpacity>
@@ -390,18 +444,19 @@ const AddScreen = () => {
         animationType="fade"
         onRequestClose={() => setModalVisible(false)}>
         <Pressable
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
           onPress={() => setModalVisible(false)}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Chọn danh mục</Text>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Chọn danh mục</Text>
             <ScrollView>
-              <Text style={styles.categorySectionTitle}>Thu nhập</Text>
+              <Text style={[styles.categorySectionTitle, { color: colors.text }]}>Thu nhập</Text>
               {incomeCategories.map(cat => (
                 <TouchableOpacity
                   key={cat.name}
                   style={[
                     styles.categoryItem,
                     category === cat.name && styles.categoryItemSelected,
+                    { backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff' }
                   ]}
                   onPress={() => {
                     setCategory(cat.name);
@@ -409,17 +464,18 @@ const AddScreen = () => {
                     setType('income');
                     setModalVisible(false);
                   }}>
-                  <Icon name={cat.icon} size={20} style={{marginRight: 10}} />
-                  <Text>{cat.name}</Text>
+                  <Icon name={cat.icon} size={20} style={{marginRight: 10}} color={colors.text} />
+                  <Text style={{ color: colors.text }}>{cat.name}</Text>
                 </TouchableOpacity>
               ))}
-              <Text style={styles.categorySectionTitle}>Chi tiêu</Text>
+              <Text style={[styles.categorySectionTitle, { color: colors.text }]}>Chi tiêu</Text>
               {expenseCategories.map(cat => (
                 <TouchableOpacity
                   key={cat.name}
                   style={[
                     styles.categoryItem,
                     category === cat.name && styles.categoryItemSelected,
+                    { backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff' }
                   ]}
                   onPress={() => {
                     setCategory(cat.name);
@@ -427,8 +483,8 @@ const AddScreen = () => {
                     setType('expense');
                     setModalVisible(false);
                   }}>
-                  <Icon name={cat.icon} size={20} style={{marginRight: 10}} />
-                  <Text>{cat.name}</Text>
+                  <Icon name={cat.icon} size={20} style={{marginRight: 10}} color={colors.text} />
+                  <Text style={{ color: colors.text }}>{cat.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -443,25 +499,26 @@ const AddScreen = () => {
         animationType="fade"
         onRequestClose={() => setModalRecurrenceVisible(false)}>
         <Pressable
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
           onPress={() => setModalRecurrenceVisible(false)}>
-          <View style={styles.modalContainer}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
             {recurrenceOptions.map(opt => (
               <TouchableOpacity
                 key={opt.value}
                 style={[
                   styles.recurrenceItem,
                   recurrence === opt.value && styles.recurrenceItemSelected,
+                  { backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff' }
                 ]}
                 onPress={() => {
                   setRecurrence(opt.value);
                   setRecurrenceDay(null);
                   setModalRecurrenceVisible(false);
                 }}>
-                <Text
-                  style={[
-                    recurrence === opt.value && {color: '#fff', fontWeight: 'bold'},
-                  ]}>
+                <Text style={[
+                  recurrence === opt.value && {color: '#fff', fontWeight: 'bold'},
+                  { color: colors.text }
+                ]}>
                   {opt.label}
                 </Text>
               </TouchableOpacity>
@@ -477,9 +534,9 @@ const AddScreen = () => {
         animationType="fade"
         onRequestClose={() => setModalRecurrenceDayVisible(false)}>
         <Pressable
-          style={styles.modalOverlay}
+          style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
           onPress={() => setModalRecurrenceDayVisible(false)}>
-          <View style={styles.modalContainer}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
             <FlatList
               data={daysInMonth}
               keyExtractor={item => item.toString()}
@@ -489,15 +546,16 @@ const AddScreen = () => {
                   style={[
                     styles.dayItem,
                     recurrenceDay === item && styles.dayItemSelected,
+                    { backgroundColor: theme === 'dark' ? '#2a2a2a' : '#fff' }
                   ]}
                   onPress={() => {
                     setRecurrenceDay(item);
                     setModalRecurrenceDayVisible(false);
                   }}>
-                  <Text
-                    style={[
-                      recurrenceDay === item && {color: '#fff', fontWeight: 'bold'},
-                    ]}>
+                  <Text style={[
+                    recurrenceDay === item && {color: '#fff', fontWeight: 'bold'},
+                    { color: colors.text }
+                  ]}>
                     {item}
                   </Text>
                 </TouchableOpacity>
@@ -513,16 +571,14 @@ const AddScreen = () => {
 export default AddScreen;
 
 const styles = StyleSheet.create({
-  container: {flex: 1, padding: 20, backgroundColor: '#fff'},
+  container: {flex: 1, padding: 20},
   title: {fontSize: 24, fontWeight: 'bold', marginBottom: 20},
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 6,
     padding: 12,
     marginBottom: 15,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
   },
   dropdown: {
     flexDirection: 'row',
@@ -530,7 +586,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   button: {
-    backgroundColor: '#3b82f6',
     paddingVertical: 15,
     borderRadius: 8,
     marginTop: 20,
@@ -538,11 +593,9 @@ const styles = StyleSheet.create({
   buttonText: {color: '#fff', fontWeight: 'bold', fontSize: 18, textAlign: 'center'},
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    backgroundColor: '#fff',
     paddingVertical: 20,
     paddingHorizontal: 16,
     borderTopLeftRadius: 16,
@@ -558,8 +611,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   walletItemSelected: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
+    backgroundColor: '#2196F3',
+    borderColor: '#2196F3',
   },
   walletItemText: {
     fontSize: 16,
@@ -578,7 +631,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   categoryItemSelected: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#2196F3',
   },
   recurrenceItem: {
     padding: 12,
@@ -588,8 +641,8 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
   },
   recurrenceItemSelected: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
+    backgroundColor: '#2196F3',
+    borderColor: '#2196F3',
   },
   dayItem: {
     flex: 1,
@@ -601,7 +654,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dayItemSelected: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
+    backgroundColor: '#2196F3',
+    borderColor: '#2196F3',
   },
 });

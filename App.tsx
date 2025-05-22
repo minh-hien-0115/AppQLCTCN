@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import { getApp } from '@react-native-firebase/app';
 import { NavigationContainer } from '@react-navigation/native';
 import { LoginNavigators, MainNavigators } from './src/navigations';
 import { ThemeProvider, useTheme } from './src/constants/ThemeContext';
@@ -17,7 +18,8 @@ function App() {
   const { navigationTheme } = useTheme();
 
   useEffect(() => {
-    const unsubscribe = auth().onAuthStateChanged(userAuth => {
+    const app = getApp();
+    const unsubscribe = auth(app).onAuthStateChanged(userAuth => {
       setUser(userAuth);
     });
 
